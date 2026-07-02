@@ -742,6 +742,8 @@ body{font-family:var(--font);background:var(--bg);color:var(--text1);font-size:1
 #loginOverlay .login-tab.active{color:#021830}
 #loginOverlay .login-logo{background:linear-gradient(135deg,#00D5FF,#021830)}
 #loginOverlay .pw-reqs span.ok{color:#023047;background:rgba(0,213,255,.22)}
+.tb-upgrade{background:var(--accent);color:#fff;border:none;border-radius:var(--r-sm);padding:7px 13px;font-family:var(--font);font-size:12px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
+.tb-upgrade:hover{filter:brightness(1.08)}
 </style>
 </head>
 <body>
@@ -894,6 +896,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text1);font-size:1
       <input placeholder="Search patients, records, studies…"/>
     </div>
     <div class="topbar-actions">
+      <button class="tb-upgrade" id="upgradeBtn" onclick="medcrmShowPlans()">⭐ Upgrade</button>
       <div class="tb-btn"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 1v6l3 2"/><circle cx="8" cy="8" r="6.5"/></svg></div>
       <div class="tb-btn"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M13 5A5 5 0 003 5c0 5-2 7-2 7h14s-2-2-2-7zM9.7 13a2 2 0 01-3.4 0"/></svg><div class="notif-dot"></div></div>
     </div>
@@ -3988,34 +3991,46 @@ body{font-family:var(--font);background:var(--bg);color:var(--text1);font-size:1
     ov.addEventListener('click', function (e) { if (e === null || e.target === ov) closeForm(); });
   }
 
-  async function showPlans() {
-    showModal('Plans & Billing', '<div class="empty-state">Loading…</div>', true);
-    try {
-      var data = await api('/billing/plans');
-      var me = window.__me || {};
-      var current = me.organization ? me.organization.tier : 'FREE';
-      var cards = data.tiers.map(function (t) {
-        var isCurrent = t.tier === current;
-        var priceHtml;
-        if (t.tier === 'FREE') priceHtml = '<div class="plan-price">$0</div>';
-        else if (t.price && t.price.custom) priceHtml = '<div class="plan-price">$' + t.price.monthly + '+<small>/provider/mo</small></div>';
-        else priceHtml = '<div class="plan-price">$' + t.price.monthly + '<small>/provider/mo</small></div>';
-        var annual = (t.tier !== 'FREE') ? '<div style="font-size:10px;color:var(--text3);margin-bottom:8px">or $' + t.price.annualMonthly + '/mo billed annually (' + data.annualDiscountPct + '% off)</div>' : '<div style="height:14px"></div>';
-        var feats = t.features.map(function (f) { return '<li>' + esc(f) + '</li>'; }).join('');
-        var btn;
-        if (isCurrent) btn = '<button class="plan-cta ghost" disabled>Current plan</button>';
-        else if (t.paymentLink) btn = '<button class="plan-cta" onclick="medcrmUpgradeLink(\'' + t.paymentLink + '\',\'' + t.tier + '\')">' + esc(t.cta) + '</button>';
-        else btn = '<button class="plan-cta" onclick="medcrmUpgrade(\'' + t.tier + '\')">' + esc(t.cta) + '</button>';
-        return '<div class="plan' + (t.popular ? ' pop' : '') + '">' + (t.popular ? '<span class="plan-badge">Most popular</span>' : '') +
-          '<div class="plan-name">' + esc(t.name) + '</div>' + priceHtml + annual +
-          '<div class="plan-blurb">' + esc(t.blurb) + '</div><ul class="plan-feats">' + feats + '</ul>' + btn + '</div>';
-      }).join('');
-      var manage = (current && current !== 'FREE') ? '<div style="text-align:center;margin-top:14px"><a href="#" onclick="medcrmManageBilling();return false;" style="font-size:12px;color:var(--accent)">Manage billing / cancel →</a></div>' : '';
-      showModal('Plans & Billing', '<div class="plan-grid">' + cards + '</div>' + manage +
-        '<div style="font-size:10px;color:var(--text3);text-align:center;margin-top:12px">Prices are per active provider, per month. Enterprise is custom-quoted.</div>', true);
-    } catch (e) {
-      showModal('Plans & Billing', '<div class="empty-state">' + esc(gated(e) ? 'You need billing access to view plans.' : 'Could not load plans: ' + e.message) + '</div>', true);
-    }
+  // Plan catalog is static marketing data + Stripe Payment Links — no API/permission needed,
+  // so any signed-in user can view plans and upgrade.
+  var MEDCRM_PLANS = {
+    annualDiscountPct: 17,
+    tiers: [
+      { tier:'FREE', name:'Free', price:{monthly:0}, popular:false, cta:'Current plan', paymentLink:null,
+        blurb:'Core clinical CRM to get started.',
+        features:['Patients & scheduling','Care pipeline','Communications','Clinical / nursing / physician boards','Team & role-based access'] },
+      { tier:'PRO', name:'Pro', price:{monthly:79,annualMonthly:66}, popular:true, cta:'Upgrade to Pro',
+        paymentLink:'https://buy.stripe.com/6oU7sLatcf9XdLl6Vk1oI0m',
+        blurb:'For growing practices that need telehealth, analytics, and AI assist.',
+        features:['Everything in Free','Telehealth','Analytics & patient stats','Customer-satisfaction surveys','AI agents activity','Administrative Task Agent','Reporting Agent + scheduled reports'] },
+      { tier:'ENTERPRISE', name:'Enterprise', price:{monthly:300,annualMonthly:249,custom:true}, popular:false, cta:'Upgrade to Enterprise',
+        paymentLink:'https://buy.stripe.com/8x26oH30K0f3cHhfrQ1oI0n',
+        blurb:'For health systems needing interoperability and quality reporting.',
+        features:['Everything in Pro','FHIR / HL7 / PACS interoperability','CMS quality measures (MIPS / PI / STAR)','BAA, SSO & audit-log export','Dedicated support + SLA','Implementation & onboarding'] }
+    ]
+  };
+  function showPlans() {
+    var data = MEDCRM_PLANS;
+    var me = window.__me || {};
+    var current = (me.organization && me.organization.tier) ? me.organization.tier : 'FREE';
+    var cards = data.tiers.map(function (t) {
+      var isCurrent = t.tier === current;
+      var priceHtml;
+      if (t.tier === 'FREE') priceHtml = '<div class="plan-price">$0</div>';
+      else if (t.price && t.price.custom) priceHtml = '<div class="plan-price">$' + t.price.monthly + '+<small>/provider/mo</small></div>';
+      else priceHtml = '<div class="plan-price">$' + t.price.monthly + '<small>/provider/mo</small></div>';
+      var annual = (t.tier !== 'FREE') ? '<div style="font-size:10px;color:var(--text3);margin-bottom:8px">or $' + t.price.annualMonthly + '/mo billed annually (' + data.annualDiscountPct + '% off)</div>' : '<div style="height:14px"></div>';
+      var feats = t.features.map(function (f) { return '<li>' + esc(f) + '</li>'; }).join('');
+      var btn;
+      if (isCurrent) btn = '<button class="plan-cta ghost" disabled>Current plan</button>';
+      else if (t.paymentLink) btn = '<button class="plan-cta" onclick="medcrmUpgradeLink(\'' + t.paymentLink + '\',\'' + t.tier + '\')">' + esc(t.cta) + '</button>';
+      else btn = '<button class="plan-cta ghost" disabled>' + esc(t.cta) + '</button>';
+      return '<div class="plan' + (t.popular ? ' pop' : '') + '">' + (t.popular ? '<span class="plan-badge">Most popular</span>' : '') +
+        '<div class="plan-name">' + esc(t.name) + '</div>' + priceHtml + annual +
+        '<div class="plan-blurb">' + esc(t.blurb) + '</div><ul class="plan-feats">' + feats + '</ul>' + btn + '</div>';
+    }).join('');
+    showModal('Plans & Billing', '<div class="plan-grid">' + cards + '</div>' +
+      '<div style="font-size:10px;color:var(--text3);text-align:center;margin-top:12px">Prices are per active provider, per month. Enterprise is custom-quoted. You\'ll complete payment securely on Stripe.</div>', true);
   }
   window.medcrmShowPlans = showPlans;
 
