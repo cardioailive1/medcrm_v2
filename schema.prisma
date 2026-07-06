@@ -45,6 +45,9 @@ model Organization {
   stripeCustomerId     String?            @unique
   stripeSubscriptionId String?            @unique
   currentPeriodEnd     DateTime?
+  primaryCareModel     CareModel          @default(VALUE_BASED_CARE)
+  careModels           CareModel[]        @default([VALUE_BASED_CARE])
+  careModelsConfigured Boolean            @default(false)
   users                User[]
   patients             Patient[]
   auditLogs            AuditLog[]
@@ -410,4 +413,16 @@ model Insight {
   createdAt      DateTime      @default(now())
 
   @@index([organizationId])
+}
+
+enum CareModel {
+  VALUE_BASED_CARE
+  CHRONIC_CARE_MANAGEMENT
+  TRANSITIONAL_CARE_MANAGEMENT
+  REMOTE_PATIENT_MONITORING
+  PRINCIPAL_CARE_MANAGEMENT
+  BEHAVIORAL_HEALTH_INTEGRATION
+  COMPLEX_CARE_MANAGEMENT
+  POPULATION_HEALTH
+  FEE_FOR_SERVICE
 }
