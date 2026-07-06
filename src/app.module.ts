@@ -22,6 +22,7 @@ import { InteropModule } from './interop/interop.module';
 import { AnalyticsModule } from './analytics/analytics.module';
 import { AdminModule } from './admin/admin.module';
 import { ReportsModule } from './reports/reports.module';
+import { OrganizationModule } from './organization/organization.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { JobsModule } from './jobs/jobs.module';
 import { HealthController } from './health/health.controller';
@@ -56,6 +57,7 @@ import { AuditInterceptor } from './common/interceptors/audit.interceptor';
     AnalyticsModule,
     AdminModule,
     ReportsModule,
+    OrganizationModule,
     ScheduleModule.forRoot(),
     JobsModule,
   ],
