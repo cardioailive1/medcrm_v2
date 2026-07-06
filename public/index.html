@@ -744,6 +744,39 @@ body{font-family:var(--font);background:var(--bg);color:var(--text1);font-size:1
 #loginOverlay .pw-reqs span.ok{color:#023047;background:rgba(0,213,255,.22)}
 .tb-upgrade{background:var(--accent);color:#fff;border:none;border-radius:var(--r-sm);padding:7px 13px;font-family:var(--font);font-size:12px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
 .tb-upgrade:hover{filter:brightness(1.08)}
+
+/* care management */
+.cm-primary{border:1px solid var(--accent);background:var(--accent-light);border-radius:10px;padding:16px}
+.cm-tag{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--accent)}
+.cm-title{font-size:16px;font-weight:700;margin-top:4px;color:var(--text1)}
+.cm-desc{font-size:12px;color:var(--text2);margin-top:4px}
+.cm-chips{display:flex;flex-wrap:wrap;gap:8px}
+.cm-chip{background:var(--surface2);border:1px solid var(--border);border-radius:16px;padding:5px 12px;font-size:12px;color:var(--text1)}
+.cm-note{margin-top:14px;font-size:11px;color:var(--text3);border-top:1px solid var(--border);padding-top:10px}
+.cm-form-intro{font-size:12px;color:var(--text2);margin-bottom:12px;line-height:1.5}
+.cm-form{display:flex;flex-direction:column;gap:2px}
+.cm-row{display:flex;align-items:flex-start;gap:10px;padding:10px;border-radius:8px}
+.cm-row:hover{background:var(--surface2)}
+.cm-en{margin-top:2px}
+.cm-row-main{flex:1;display:flex;flex-direction:column}
+.cm-row-name{font-size:13px;font-weight:600;color:var(--text1)}
+.cm-req{font-size:9px;font-weight:700;color:var(--accent);background:var(--accent-light);padding:1px 6px;border-radius:8px;text-transform:uppercase;margin-left:4px}
+.cm-row-desc{font-size:11px;color:var(--text3);margin-top:2px}
+.cm-primary-pick{font-size:11px;color:var(--text2);display:flex;align-items:center;gap:4px;white-space:nowrap}
+
+/* value-based care panel */
+.vbc-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px}
+.vbc-title{font-size:15px;font-weight:700;color:var(--text1)}
+.vbc-sub{font-size:12px;color:var(--text3);margin-top:2px}
+.vbc-kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px}
+.vbc-kpi{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px 14px}
+.vbc-kpi-v{font-size:22px;font-weight:700;color:var(--text1);line-height:1.1}
+.vbc-kpi-l{font-size:11px;font-weight:600;color:var(--text2);margin-top:4px}
+.vbc-kpi-s{font-size:10px;color:var(--text3);margin-top:2px}
+.vbc-lock{background:var(--accent-light);border:1px dashed var(--accent);border-radius:10px;padding:16px;text-align:center}
+.vbc-lock-t{font-size:13px;font-weight:700;color:var(--accent)}
+.vbc-lock-s{font-size:12px;color:var(--text2);margin-top:4px}
+@media(max-width:560px){.vbc-kpis{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -810,6 +843,9 @@ body{font-family:var(--font);background:var(--bg);color:var(--text1);font-size:1
     <div class="nav-label">Overview</div>
     <div class="nav-item active" onclick="goto('dashboard',this)">
       <svg class="ni-icon" viewBox="0 0 16 16" fill="currentColor"><rect x="1" y="1" width="6" height="6" rx="1.5"/><rect x="9" y="1" width="6" height="6" rx="1.5"/><rect x="1" y="9" width="6" height="6" rx="1.5"/><rect x="9" y="9" width="6" height="6" rx="1.5"/></svg>Dashboard
+    </div>
+    <div class="nav-item" onclick="goto('care',this)">
+      <span class="ni-icon"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 14s-5-3.2-5-7a3 3 0 015-2 3 3 0 015 2c0 3.8-5 7-5 7z"/></svg></span>Care Management
     </div>
     <div class="nav-item" onclick="goto('analytics',this)">
       <svg class="ni-icon" viewBox="0 0 16 16" fill="currentColor"><path d="M1 12l4-4 3 3 4-5 3 3V14H1v-2z"/></svg>Analytics
@@ -1953,12 +1989,18 @@ body{font-family:var(--font);background:var(--bg);color:var(--text1);font-size:1
     </div>
 
     <!-- ══════ SETTINGS ══════ -->
+    <!-- Care Management -->
+    <div class="page" id="care">
+      <div id="careBody"><div class="empty-state" style="padding:40px">Loading care models…</div></div>
+    </div>
+
     <div class="page" id="settings">
       <div class="settings-grid">
         <div class="settings-nav">
           <div class="settings-nav-item active-sn" onclick="setSec('org',this)">Organization</div>
           <div class="settings-nav-item" onclick="setSec('team',this)">Team & Providers</div>
           <div class="settings-nav-item" onclick="setSec('notif',this)">Notifications</div>
+          <div class="settings-nav-item" onclick="setSec('caremodels',this)">Care Models</div>
           <div class="settings-nav-item" onclick="setSec('integrations',this)">Integrations</div>
           <div class="settings-nav-item" onclick="setSec('compliance',this)">Compliance & HIPAA</div>
         </div>
@@ -1993,6 +2035,9 @@ body{font-family:var(--font);background:var(--bg);color:var(--text1);font-size:1
             <div class="toggle-row"><div class="toggle-info"><div class="toggle-name">FHIR sync errors</div><div class="toggle-desc">Alert admin when FHIR sync fails or times out</div></div><div class="toggle on" onclick="this.classList.toggle('on')"><div class="toggle-knob"></div></div></div>
             <div class="toggle-row"><div class="toggle-info"><div class="toggle-name">HL7 message failures</div><div class="toggle-desc">Notify when inbound HL7 messages cannot be parsed</div></div><div class="toggle on" onclick="this.classList.toggle('on')"><div class="toggle-knob"></div></div></div>
             <div class="toggle-row"><div class="toggle-info"><div class="toggle-name">PACS new study alert</div><div class="toggle-desc">Notify radiologist and ordering provider on new study</div></div><div class="toggle on" onclick="this.classList.toggle('on')"><div class="toggle-knob"></div></div></div>
+          </div>
+          <div class="settings-section" id="sec-caremodels">
+            <div id="caremodelsBody"><div class="empty-state">Loading…</div></div>
           </div>
           <div class="settings-section" id="sec-integrations">
             <div class="section-title">Integrations</div>
@@ -3885,6 +3930,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text1);font-size:1
     'wf-nursing': function () { renderWorkflow('nursing', 'wf-nursing'); },
     'wf-physician': function () { renderWorkflow('physician', 'wf-physician'); },
     'agent-admin': renderAdmin, 'agent-reports': renderReports,
+    care: function () { renderCarePage(); },
   };
   var loaded = {};
   function loadPage(id) { if (loaded[id]) return; var fn = LOADERS[id]; if (fn) { loaded[id] = true; fn(); } }
@@ -3893,6 +3939,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text1);font-size:1
   async function bootstrap() {
     try { await loadMe(); } catch (e) { showLogin(); return; }
     clearStatic();
+    careOnboarding();
     var active = document.querySelector('.page.active');
     loadPage(active ? active.id : 'dashboard');
   }
@@ -3957,7 +4004,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text1);font-size:1
     if (gT()) { hideLogin(); startIdle(); bootstrap(); } else { showLogin(); }
   });
 
-  var titles = { dashboard: 'Dashboard', patients: 'Patients', appointments: 'Appointments', telehealth: 'Telehealth Consulting', pipeline: 'Care Pipeline', comms: 'Communications', agents: 'AI Agents', 'agent-admin': 'Administrative Task Agent', 'agent-reports': 'Reporting Agent', interop: 'FHIR / HL7 / PACS Integration', 'wf-clinical': 'Clinical Workflow Pipeline', 'wf-nursing': 'Nursing Staff Pipeline', 'wf-physician': 'Physician Pipeline', 'wf-satisfaction': 'Customer Satisfaction Pipeline', 'wf-cms': 'CMS — Medicare & Medicaid Pipeline', analytics: 'Analytics', settings: 'Settings' };
+  var titles = { dashboard: 'Dashboard', patients: 'Patients', appointments: 'Appointments', telehealth: 'Telehealth Consulting', pipeline: 'Care Pipeline', comms: 'Communications', agents: 'AI Agents', 'agent-admin': 'Administrative Task Agent', 'agent-reports': 'Reporting Agent', interop: 'FHIR / HL7 / PACS Integration', 'wf-clinical': 'Clinical Workflow Pipeline', 'wf-nursing': 'Nursing Staff Pipeline', 'wf-physician': 'Physician Pipeline', 'wf-satisfaction': 'Customer Satisfaction Pipeline', 'wf-cms': 'CMS — Medicare & Medicaid Pipeline', analytics: 'Analytics', care: 'Care Management', settings: 'Settings' };
   window.goto = function (id, el) {
     document.querySelectorAll('.page').forEach(function (p) { p.classList.remove('active'); });
     var pg = document.getElementById(id); if (pg) pg.classList.add('active');
@@ -3970,7 +4017,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text1);font-size:1
     document.querySelectorAll('.settings-section').forEach(function (s) { s.classList.remove('active-ss'); });
     var s = document.getElementById('sec-' + id); if (s) s.classList.add('active-ss');
     document.querySelectorAll('.settings-nav-item').forEach(function (n) { n.classList.remove('active-sn'); });
-    if (el) el.classList.add('active-sn'); if (id === 'team') loadTeam();
+    if (el) el.classList.add('active-sn'); if (id === 'team') loadTeam(); if (id === 'caremodels') renderCareModels('caremodelsBody');
   };
   window.selMsg = function (el) { window.medcrmOpenMsg(el); };
   window.itab = function (id, el) {
@@ -4033,6 +4080,145 @@ body{font-family:var(--font);background:var(--bg);color:var(--text1);font-size:1
       '<div style="font-size:10px;color:var(--text3);text-align:center;margin-top:12px">Prices are per active provider, per month. Enterprise is custom-quoted. You\'ll complete payment securely on Stripe.</div>', true);
   }
   window.medcrmShowPlans = showPlans;
+  /* ---- Care Management ---- */
+  var CARE_MODELS = [
+    { id:'VALUE_BASED_CARE', name:'Value-Based Care', desc:'Reimbursement tied to outcomes and quality. The recommended default model.' },
+    { id:'CHRONIC_CARE_MANAGEMENT', name:'Chronic Care Management (CCM)', desc:'Ongoing management of patients with two or more chronic conditions.' },
+    { id:'TRANSITIONAL_CARE_MANAGEMENT', name:'Transitional Care Management (TCM)', desc:'Coordinated care during the 30 days after a hospital discharge.' },
+    { id:'REMOTE_PATIENT_MONITORING', name:'Remote Patient Monitoring (RPM)', desc:'Device-based monitoring of physiologic data between visits.' },
+    { id:'PRINCIPAL_CARE_MANAGEMENT', name:'Principal Care Management (PCM)', desc:'Focused management of a single high-risk chronic condition.' },
+    { id:'BEHAVIORAL_HEALTH_INTEGRATION', name:'Behavioral Health Integration (BHI)', desc:'Integrating behavioral health services into primary care.' },
+    { id:'COMPLEX_CARE_MANAGEMENT', name:'Complex Care Management', desc:'Intensive coordination for high-need, high-cost patients.' },
+    { id:'POPULATION_HEALTH', name:'Population Health Management', desc:'Managing outcomes across a defined patient population.' },
+    { id:'FEE_FOR_SERVICE', name:'Fee-for-Service (Traditional)', desc:'Volume-based billing per service rendered.' }
+  ];
+  var careCfg = null;
+  function cmName(id){ var m=CARE_MODELS.filter(function(x){return x.id===id;})[0]; return m?m.name:id; }
+  function cmDesc(id){ var m=CARE_MODELS.filter(function(x){return x.id===id;})[0]; return m?m.desc:''; }
+  function cmCanEdit(){ return (((window.__me&&window.__me.permissions)||[]).indexOf('org:manage')>=0); }
+  async function loadCareCfg(force){
+    if(careCfg && !force) return careCfg;
+    try{ careCfg = await api('/organization'); }
+    catch(e){ careCfg = { primaryCareModel:'VALUE_BASED_CARE', careModels:['VALUE_BASED_CARE'], careModelsConfigured:false }; }
+    return careCfg;
+  }
+  async function renderCareModels(containerId){
+    var el=document.getElementById(containerId); if(!el) return;
+    el.innerHTML='<div class="empty-state">Loading…</div>';
+    var cfg=await loadCareCfg(true);
+    var enabled=cfg.careModels||['VALUE_BASED_CARE'];
+    var primary=cfg.primaryCareModel||'VALUE_BASED_CARE';
+    var others=enabled.filter(function(id){return id!==primary;});
+    var otherHtml=others.length? others.map(function(id){return '<div class="cm-chip" title="'+esc(cmDesc(id))+'">'+esc(cmName(id))+'</div>';}).join('') : '<div style="font-size:12px;color:var(--text3)">No additional models enabled yet.</div>';
+    el.innerHTML='<div class="card" style="padding:18px;max-width:760px">'
+      +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">'
+      +'<div style="font-weight:600;font-size:14px">Care Management Models</div>'
+      +(cmCanEdit()?'<button class="btn-primary" onclick="medcrmEditCareModels()">Configure</button>':'')
+      +'</div>'
+      +'<div class="cm-primary"><div class="cm-tag">Primary model</div><div class="cm-title">'+esc(cmName(primary))+'</div><div class="cm-desc">'+esc(cmDesc(primary))+'</div></div>'
+      +'<div style="font-size:12px;font-weight:600;margin:16px 0 8px;color:var(--text2)">Additional models enabled</div>'
+      +'<div class="cm-chips">'+otherHtml+'</div>'
+      +(cfg.careModelsConfigured?'':'<div class="cm-note">Not yet configured — Value-Based Care applies by default. Click Configure to tailor it.</div>')
+      +'</div>';
+  }
+  window.renderCareModels=renderCareModels;
+  function cmFormHtml(cfg){
+    var enabled=cfg.careModels||['VALUE_BASED_CARE'];
+    var primary=cfg.primaryCareModel||'VALUE_BASED_CARE';
+    var rows=CARE_MODELS.map(function(m){
+      var isVBC=m.id==='VALUE_BASED_CARE';
+      var on=enabled.indexOf(m.id)>=0||isVBC;
+      var isPrimary=m.id===primary;
+      return '<div class="cm-row">'
+        +'<input type="checkbox" class="cm-en" value="'+m.id+'" '+(on?'checked':'')+(isVBC?' disabled':'')+'>'
+        +'<span class="cm-row-main"><span class="cm-row-name">'+esc(m.name)+(isVBC?' <span class="cm-req">default</span>':'')+'</span><span class="cm-row-desc">'+esc(m.desc)+'</span></span>'
+        +'<label class="cm-primary-pick"><input type="radio" name="cmPrimary" value="'+m.id+'" '+(isPrimary?'checked':'')+'> primary</label>'
+        +'</div>';
+    }).join('');
+    return '<div class="cm-form-intro">Choose the care models your practice runs. <b>Value-Based Care</b> is the default primary model — enable any others based on your preference and pick which one is primary.</div>'
+      +'<div class="cm-form">'+rows+'</div>'
+      +'<div style="text-align:right;margin-top:14px"><button class="btn-primary" onclick="medcrmSaveCareModels()">Save models</button></div>'
+      +'<div id="cmErr" style="color:#dc2626;font-size:12px;margin-top:8px"></div>';
+  }
+  async function editCareModels(){ var cfg=await loadCareCfg(false); showModal('Configure Care Models', cmFormHtml(cfg), true); }
+  window.medcrmEditCareModels=editCareModels;
+  window.medcrmSaveCareModels=async function(){
+    var enabled=Array.prototype.slice.call(document.querySelectorAll('.cm-en')).filter(function(c){return c.checked;}).map(function(c){return c.value;});
+    if(enabled.indexOf('VALUE_BASED_CARE')<0) enabled.push('VALUE_BASED_CARE');
+    var pr=document.querySelector('input[name="cmPrimary"]:checked');
+    var primary=pr?pr.value:'VALUE_BASED_CARE';
+    if(enabled.indexOf(primary)<0) enabled.push(primary);
+    try{
+      careCfg=await api('/organization/care-models',{method:'PATCH',body:{primaryCareModel:primary,careModels:enabled}});
+      closeForm();
+      if(document.getElementById('careBody')) renderCareModels('careBody');
+      var sc=document.getElementById('sec-caremodels');
+      if(sc&&sc.classList.contains('active-ss')) renderCareModels('caremodelsBody');
+    }catch(e){ var er=document.getElementById('cmErr'); if(er) er.textContent=gated(e)?'Only admins can change care models.':('Could not save: '+e.message); }
+  };
+  async function careOnboarding(){
+    try{
+      var cfg=await loadCareCfg(true);
+      if(cmCanEdit() && cfg && !cfg.careModelsConfigured){ showModal('Welcome — choose your care model', cmFormHtml(cfg), true); }
+    }catch(e){}
+  }
+  window.medcrmCareOnboarding=careOnboarding;
+  /* ---- Value-Based Care performance panel ---- */
+  function kpi(label, value, sub){
+    return '<div class="vbc-kpi"><div class="vbc-kpi-v">'+value+'</div><div class="vbc-kpi-l">'+esc(label)+'</div>'+(sub?'<div class="vbc-kpi-s">'+esc(sub)+'</div>':'')+'</div>';
+  }
+  async function renderVbcPanel(){
+    var el=document.getElementById('vbcPanel'); if(!el) return;
+    var cfg=await loadCareCfg(false);
+    var enabled=(cfg.careModels||['VALUE_BASED_CARE']);
+    // attributed lives — real count from patients (Free tier)
+    var patientCount=null;
+    try{ var pts=await api('/patients'); patientCount=Array.isArray(pts)?pts.length:(pts&&pts.length)||0; }catch(e){ patientCount=null; }
+    // value-based analytics — Pro-gated; light up the upgrade path if not available
+    var a=null, gatedA=false;
+    try{ a=await api('/analytics'); }catch(e){ if(gated(e)) gatedA=true; }
+
+    var head='<div class="vbc-head"><div><div class="vbc-title">Value-Based Care performance</div>'
+      +'<div class="vbc-sub">Outcome- and quality-based view across your attributed population.</div></div>'
+      +'<span class="badge-blue" style="padding:4px 10px;border-radius:12px;font-size:11px;font-weight:600">Primary model</span></div>';
+
+    var topRow='<div class="vbc-kpis">'
+      + kpi('Attributed patients', (patientCount==null?'—':patientCount), 'Population under management')
+      + kpi('Active care programs', enabled.length, enabled.length>1?(enabled.length-1)+' beyond VBC':'VBC only')
+      + kpi('Primary model', 'VBC', 'Value-Based Care')
+      + '</div>';
+
+    var quality;
+    if(a){
+      var sat=(typeof a.satisfaction==='number')? a.satisfaction.toFixed(1)+' / 5':'—';
+      var total=(a.appointments||0), ns=(a.noShows||0);
+      var showRate=total? Math.round((1-ns/total)*100)+'%':'—';
+      quality='<div class="vbc-kpis">'
+        + kpi('Patient satisfaction', sat, 'Survey mean')
+        + kpi('Appointment show rate', showRate, ns+' no-shows of '+total)
+        + kpi('Telehealth encounters', (a.telehealthSessions||0), 'Access / continuity')
+        + '</div>';
+    } else if(gatedA){
+      quality='<div class="vbc-lock"><div class="vbc-lock-t">Value-based analytics are a Pro feature</div>'
+        +'<div class="vbc-lock-s">Quality scores, show-rate, and outcome trends for your attributed population unlock on Pro.</div>'
+        +'<button class="btn-primary" style="margin-top:10px" onclick="medcrmShowPlans()">View plans</button></div>';
+    } else {
+      quality='<div class="vbc-lock"><div class="vbc-lock-s">Quality metrics will appear here once there is visit and survey data.</div></div>';
+    }
+    el.innerHTML='<div class="card" style="padding:18px;max-width:760px;margin-bottom:16px">'+head+topRow
+      +'<div style="font-size:12px;font-weight:600;margin:6px 0 8px;color:var(--text2)">Quality & outcomes</div>'+quality+'</div>';
+  }
+  window.renderVbcPanel=renderVbcPanel;
+
+  function renderCarePage(){
+    var el=document.getElementById('careBody'); if(!el) return;
+    el.innerHTML='<div id="vbcPanel"></div><div id="careModelsCard"></div>';
+    renderVbcPanel();
+    renderCareModels('careModelsCard');
+  }
+  window.renderCarePage=renderCarePage;
+
+
 
   window.medcrmUpgrade = async function (tier) {
     try {
