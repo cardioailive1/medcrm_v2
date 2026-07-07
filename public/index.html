@@ -4127,7 +4127,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text1);font-size:1
   var careCfg = null;
   function cmName(id){ var m=CARE_MODELS.filter(function(x){return x.id===id;})[0]; return m?m.name:id; }
   function cmDesc(id){ var m=CARE_MODELS.filter(function(x){return x.id===id;})[0]; return m?m.desc:''; }
-  function cmCanEdit(){ return (((window.__me&&window.__me.permissions)||[]).indexOf('org:manage')>=0); }
+  function cmCanEdit(){ return (((window.__me&&window.__me.permissions)||[]).indexOf('patient:update')>=0); }
   async function loadCareCfg(force){
     if(careCfg && !force) return careCfg;
     try{ careCfg = await api('/organization'); }
@@ -4186,7 +4186,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text1);font-size:1
       if(document.getElementById('careBody')) renderCareModels('careBody');
       var sc=document.getElementById('sec-caremodels');
       if(sc&&sc.classList.contains('active-ss')) renderCareModels('caremodelsBody');
-    }catch(e){ var er=document.getElementById('cmErr'); if(er) er.textContent=gated(e)?'Only admins can change care models.':('Could not save: '+e.message); }
+    }catch(e){ var er=document.getElementById('cmErr'); if(er) er.textContent=gated(e)?'You need patient-update permission to change care models.':('Could not save: '+e.message); }
   };
   async function careOnboarding(){
     try{
