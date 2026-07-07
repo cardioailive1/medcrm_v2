@@ -48,6 +48,9 @@ model Organization {
   primaryCareModel     CareModel          @default(VALUE_BASED_CARE)
   careModels           CareModel[]        @default([VALUE_BASED_CARE])
   careModelsConfigured Boolean            @default(false)
+  careEnrollments      CareEnrollment[]
+  careActivities       CareActivity[]
+  careGaps             CareGap[]
   users                User[]
   patients             Patient[]
   auditLogs            AuditLog[]
@@ -118,6 +121,9 @@ model Patient {
   status         PatientStatus @default(ACTIVE)
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
+
+  enrollments    CareEnrollment[]
+  careGaps       CareGap[]
 
   @@unique([organizationId, mrn])
   @@index([organizationId])
@@ -425,4 +431,86 @@ enum CareModel {
   COMPLEX_CARE_MANAGEMENT
   POPULATION_HEALTH
   FEE_FOR_SERVICE
+}
+
+model CareEnrollment {
+  id             String           @id @default(cuid())
+  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organizationId String
+  patient        Patient          @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  patientId      String
+  model          CareModel
+  status         EnrollmentStatus @default(ACTIVE)
+  riskLevel      RiskLevel        @default(MEDIUM)
+  enrolledAt     DateTime         @default(now())
+  dischargeDate  DateTime?
+  notes          String?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  activities     CareActivity[]
+
+  @@unique([patientId, model])
+  @@index([organizationId])
+  @@index([patientId])
+}
+
+model CareActivity {
+  id             String         @id @default(cuid())
+  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organizationId String
+  enrollment     CareEnrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  enrollmentId   String
+  type           ActivityType
+  minutes        Int?
+  readingDays    Int?
+  occurredAt     DateTime       @default(now())
+  note           String?
+  createdById    String?
+  createdAt      DateTime       @default(now())
+
+  @@index([organizationId])
+  @@index([enrollmentId])
+}
+
+model CareGap {
+  id             String       @id @default(cuid())
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organizationId String
+  patient        Patient      @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  patientId      String
+  measure        String
+  status         GapStatus    @default(OPEN)
+  dueDate        DateTime?
+  closedAt       DateTime?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([organizationId])
+  @@index([patientId])
+}
+
+enum EnrollmentStatus {
+  ACTIVE
+  PAUSED
+  COMPLETED
+  DISCHARGED
+}
+
+enum RiskLevel {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum ActivityType {
+  TIME_LOG
+  DEVICE_READING
+  CONTACT
+  VISIT
+  NOTE
+}
+
+enum GapStatus {
+  OPEN
+  CLOSED
 }
