@@ -777,6 +777,38 @@ body{font-family:var(--font);background:var(--bg);color:var(--text1);font-size:1
 .vbc-lock-t{font-size:13px;font-weight:700;color:var(--accent)}
 .vbc-lock-s{font-size:12px;color:var(--text2);margin-top:4px}
 @media(max-width:560px){.vbc-kpis{grid-template-columns:1fr}}
+
+/* care programs */
+.cp-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.cp-card{border:1px solid var(--border);border-radius:10px;padding:14px}
+.cp-name{font-size:13px;font-weight:700;color:var(--text1)}
+.cp-target{font-size:10px;color:var(--text3);margin:2px 0 8px;min-height:26px}
+.cp-stats{font-size:12px;color:var(--text2)}
+.cp-count{font-size:18px;font-weight:700;color:var(--text1)}
+.cp-view{margin-top:10px;width:100%;padding:6px;border:1px solid var(--border);background:var(--bg);border-radius:6px;font-family:var(--font);font-size:11px;font-weight:600;cursor:pointer;color:var(--text2)}
+.cp-view:hover{background:var(--surface2)}
+.cp-reg{display:flex;flex-direction:column;gap:2px;max-height:60vh;overflow-y:auto}
+.cp-row{display:flex;align-items:center;gap:10px;padding:10px;border-radius:8px}
+.cp-row:hover{background:var(--surface2)}
+.cp-row-main{flex:1}
+.cp-row-name{font-size:13px;font-weight:600;color:var(--text1);display:flex;gap:8px;align-items:center}
+.cp-row-prog{display:flex;align-items:center;gap:8px;margin-top:5px}
+.cp-bar{flex:1;max-width:180px;height:6px;background:var(--border);border-radius:3px;overflow:hidden}
+.cp-bar-fill{height:100%;border-radius:3px}
+.cp-prog-txt{font-size:10px;color:var(--text3)}
+.cp-log{padding:5px 10px;border:none;background:var(--accent);color:#fff;border-radius:6px;font-family:var(--font);font-size:11px;font-weight:600;cursor:pointer}
+.cp-rm{padding:4px 9px;border:1px solid var(--border);background:var(--bg);border-radius:6px;cursor:pointer;color:var(--text3);font-size:14px;line-height:1}
+.frm label{display:block;font-size:11px;font-weight:600;color:var(--text2);margin:10px 0 4px}
+.frm input,.frm select{width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;font-family:var(--font);font-size:13px;background:var(--surface);color:var(--text1)}
+@media(max-width:560px){.cp-grid{grid-template-columns:1fr}}
+
+/* vbc dashboard risk bars */
+.rk{display:flex;flex-direction:column;gap:6px}
+.rk-row{display:flex;align-items:center;gap:10px}
+.rk-l{font-size:11px;color:var(--text2);width:70px}
+.rk-bar{flex:1;height:8px;background:var(--border);border-radius:4px;overflow:hidden}
+.rk-fill{height:100%;border-radius:4px;min-width:2px}
+.rk-v{font-size:12px;font-weight:700;color:var(--text1);width:28px;text-align:right}
 </style>
 </head>
 <body>
@@ -4212,11 +4244,174 @@ body{font-family:var(--font);background:var(--bg);color:var(--text1);font-size:1
 
   function renderCarePage(){
     var el=document.getElementById('careBody'); if(!el) return;
-    el.innerHTML='<div id="vbcPanel"></div><div id="careModelsCard"></div>';
+    el.innerHTML='<div id="vbcPanel"></div><div id="careDash"></div><div id="careProgramsBody" style="margin-bottom:16px"></div><div id="careModelsCard"></div>';
     renderVbcPanel();
+    renderCareDashboard();
+    renderPrograms();
     renderCareModels('careModelsCard');
   }
   window.renderCarePage=renderCarePage;
+  /* ---- Care programs: enrollment + activity workflows ---- */
+  var ACTIVITY_TYPES = { TIME_LOG:'Time logged', DEVICE_READING:'Device reading', CONTACT:'Patient contact', VISIT:'Visit', NOTE:'Note' };
+  function riskBadge(r){ var c=r==='HIGH'?'#dc2626':r==='LOW'?'#16a34a':'#d97706'; return '<span style="font-size:10px;font-weight:700;color:'+c+'">'+esc(r)+'</span>'; }
+  function progBar(p){ var c=p>=100?'#16a34a':p>=50?'#d97706':'#dc2626'; return '<div class="cp-bar"><div class="cp-bar-fill" style="width:'+Math.min(100,p)+'%;background:'+c+'"></div></div>'; }
+
+  async function renderPrograms(){
+    var el=document.getElementById('careProgramsBody'); if(!el) return;
+    el.innerHTML='<div class="empty-state">Loading programs…</div>';
+    var cfg=await loadCareCfg(false);
+    var enabled=(cfg.careModels||['VALUE_BASED_CARE']);
+    var canEdit=(((window.__me&&window.__me.permissions)||[]).indexOf('patient:update')>=0);
+    var summary={models:[]};
+    try{ summary=await api('/care/summary'); }catch(e){}
+    var byModel={}; summary.models.forEach(function(m){ byModel[m.model]=m; });
+    var cards=enabled.map(function(id){
+      var s=byModel[id]||{count:0,onTrack:0,targetLabel:''};
+      return '<div class="cp-card">'
+        +'<div class="cp-name">'+esc(cmName(id))+'</div>'
+        +'<div class="cp-target">'+esc(s.targetLabel||cmDesc(id))+'</div>'
+        +'<div class="cp-stats"><span class="cp-count">'+(s.count||0)+'</span> enrolled'
+        +(s.count?' · <b style="color:#16a34a">'+(s.onTrack||0)+'</b> on track':'')+'</div>'
+        +'<button class="cp-view" onclick="medcrmOpenRegistry(\''+id+'\')">View registry</button>'
+        +'</div>';
+    }).join('');
+    el.innerHTML='<div class="card" style="padding:18px;max-width:760px">'
+      +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">'
+      +'<div style="font-weight:600;font-size:14px">Care programs</div>'
+      +(canEdit?'<button class="btn-primary" onclick="medcrmOpenEnroll()">Enroll patient</button>':'')
+      +'</div><div class="cp-grid">'+cards+'</div></div>';
+  }
+  window.renderPrograms=renderPrograms;
+
+  window.medcrmOpenEnroll=async function(){
+    var cfg=await loadCareCfg(false); var enabled=cfg.careModels||['VALUE_BASED_CARE'];
+    var pts=[]; try{ pts=await api('/patients'); }catch(e){}
+    var ptOpts=(pts||[]).map(function(p){return '<option value="'+p.id+'">'+esc(p.lastName+', '+p.firstName+' ('+p.mrn+')')+'</option>';}).join('');
+    var mdOpts=enabled.map(function(id){return '<option value="'+id+'">'+esc(cmName(id))+'</option>';}).join('');
+    showModal('Enroll patient in a program',
+      '<div class="frm"><label>Patient</label><select id="enPatient">'+ptOpts+'</select>'
+      +'<label>Program</label><select id="enModel">'+mdOpts+'</select>'
+      +'<label>Risk level</label><select id="enRisk"><option value="LOW">Low</option><option value="MEDIUM" selected>Medium</option><option value="HIGH">High</option></select>'
+      +'<label>Discharge date (TCM only, optional)</label><input type="date" id="enDischarge">'
+      +'<label>Notes (optional)</label><input type="text" id="enNotes" placeholder="e.g. two chronic conditions">'
+      +'<div style="text-align:right;margin-top:12px"><button class="btn-primary" onclick="medcrmSubmitEnroll()">Enroll</button></div>'
+      +'<div id="enErr" style="color:#dc2626;font-size:12px;margin-top:8px"></div></div>', false);
+  };
+  window.medcrmSubmitEnroll=async function(){
+    var body={ patientId:document.getElementById('enPatient').value, model:document.getElementById('enModel').value, riskLevel:document.getElementById('enRisk').value };
+    var d=document.getElementById('enDischarge').value; if(d) body.dischargeDate=new Date(d).toISOString();
+    var n=document.getElementById('enNotes').value; if(n) body.notes=n;
+    if(!body.patientId){ document.getElementById('enErr').textContent='Pick a patient (add one first if none listed).'; return; }
+    try{ await api('/care/enrollments',{method:'POST',body:body}); closeForm(); renderPrograms(); }
+    catch(e){ document.getElementById('enErr').textContent=gated(e)?'You need patient-update permission to enroll.':(e.message.indexOf('Unique')>=0?'That patient is already enrolled in this program.':'Could not enroll: '+e.message); }
+  };
+
+  window.medcrmOpenRegistry=async function(model){
+    showModal(cmName(model)+' — registry','<div class="empty-state">Loading…</div>',true);
+    var rows=[]; try{ rows=await api('/care/enrollments?model='+encodeURIComponent(model)); }catch(e){}
+    var canEdit=(((window.__me&&window.__me.permissions)||[]).indexOf('patient:update')>=0);
+    var body = rows.length? rows.map(function(e){
+      var pt=e.patient?e.patient.lastName+', '+e.patient.firstName:'—';
+      var prog = e.metric==='none'? '<span style="font-size:11px;color:var(--text3)">outcome-based</span>'
+        : progBar(e.progress)+'<span class="cp-prog-txt">'+e.current+(e.metric==='minutes'?' min':e.metric==='readingDays'?' days':'')+' / '+e.target+'</span>';
+      return '<div class="cp-row"><div class="cp-row-main"><div class="cp-row-name">'+esc(pt)+'  '+riskBadge(e.riskLevel)+'</div>'
+        +'<div class="cp-row-prog">'+prog+'</div></div>'
+        +(canEdit&&e.metric!=='none'?'<button class="cp-log" onclick="medcrmLogActivity(\''+e.id+'\',\''+model+'\')">Log</button>':'')
+        +(canEdit?'<button class="cp-rm" title="Unenroll" onclick="medcrmUnenroll(\''+e.id+'\',\''+model+'\')">×</button>':'')
+        +'</div>';
+    }).join('') : '<div class="empty-state">No patients enrolled yet. Use “Enroll patient”.</div>';
+    showModal(cmName(model)+' — registry','<div class="cp-reg">'+body+'</div>',true);
+  };
+  window.medcrmUnenroll=async function(id,model){
+    if(!confirm('Remove this patient from the program?')) return;
+    try{ await api('/care/enrollments/'+id,{method:'DELETE'}); medcrmOpenRegistry(model); renderPrograms(); }catch(e){ alert('Could not remove: '+e.message); }
+  };
+  window.medcrmLogActivity=function(id,model){
+    var minutesModels=['CHRONIC_CARE_MANAGEMENT','PRINCIPAL_CARE_MANAGEMENT','COMPLEX_CARE_MANAGEMENT','BEHAVIORAL_HEALTH_INTEGRATION'];
+    var field;
+    if(minutesModels.indexOf(model)>=0) field='<label>Minutes of care coordination</label><input type="number" id="acVal" min="0" value="10">';
+    else if(model==='REMOTE_PATIENT_MONITORING') field='<label>Device-days with readings</label><input type="number" id="acVal" min="0" value="1">';
+    else field='<label>Type</label><select id="acType"><option value="CONTACT">Patient contact</option><option value="VISIT">Visit</option></select>';
+    showModal('Log activity',
+      '<div class="frm">'+field
+      +'<label>Note (optional)</label><input type="text" id="acNote">'
+      +'<div style="text-align:right;margin-top:12px"><button class="btn-primary" onclick="medcrmSubmitActivity(\''+id+'\',\''+model+'\')">Save</button></div>'
+      +'<div id="acErr" style="color:#dc2626;font-size:12px;margin-top:8px"></div></div>', false);
+  };
+  /* ---- Value-Based Care dashboard: risk + care gaps ---- */
+  async function renderCareDashboard(){
+    var el=document.getElementById('careDash'); if(!el) return;
+    var d=null; try{ d=await api('/care/dashboard'); }catch(e){}
+    if(!d){ el.innerHTML=''; return; }
+    var canEdit=(((window.__me&&window.__me.permissions)||[]).indexOf('patient:update')>=0);
+    var totalRisk=(d.risk.LOW||0)+(d.risk.MEDIUM||0)+(d.risk.HIGH||0);
+    function rb(label,val,color){ var pct=totalRisk?Math.round(val/totalRisk*100):0; return '<div class="rk-row"><span class="rk-l">'+label+'</span><div class="rk-bar"><div class="rk-fill" style="width:'+pct+'%;background:'+color+'"></div></div><span class="rk-v">'+val+'</span></div>'; }
+    var risk='<div class="rk">'+rb('High risk',d.risk.HIGH||0,'#dc2626')+rb('Medium',d.risk.MEDIUM||0,'#d97706')+rb('Low',d.risk.LOW||0,'#16a34a')+'</div>';
+    var gaps='<div class="vbc-kpis">'
+      + kpi('Open care gaps', d.gaps.open, (d.gaps.overdue||0)+' overdue')
+      + kpi('Gap closure rate', d.gaps.closureRate+'%', d.gaps.closed+' closed')
+      + kpi('Programs on track', d.onTrackRate+'%', d.programsOnTrack+' of '+d.programsBillable+' billable')
+      + '</div>';
+    el.innerHTML='<div class="card" style="padding:18px;max-width:760px;margin-bottom:16px">'
+      +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">'
+      +'<div style="font-weight:600;font-size:14px">Population health & care gaps</div>'
+      +(canEdit?'<button class="btn-primary" onclick="medcrmOpenGaps()">Manage gaps</button>':'')
+      +'</div>'
+      +'<div style="font-size:12px;font-weight:600;margin:2px 0 8px;color:var(--text2)">Risk stratification ('+totalRisk+' attributed)</div>'+risk
+      +'<div style="font-size:12px;font-weight:600;margin:16px 0 8px;color:var(--text2)">Care gaps & quality</div>'+gaps
+      +'</div>';
+  }
+  window.renderCareDashboard=renderCareDashboard;
+
+  window.medcrmOpenGaps=async function(){
+    showModal('Care gaps','<div class="empty-state">Loading…</div>',true);
+    var rows=[]; try{ rows=await api('/care/gaps'); }catch(e){}
+    var canEdit=(((window.__me&&window.__me.permissions)||[]).indexOf('patient:update')>=0);
+    var now=Date.now();
+    var body=rows.length? rows.map(function(g){
+      var pt=g.patient?g.patient.lastName+', '+g.patient.firstName:'—';
+      var overdue=g.status==='OPEN'&&g.dueDate&&new Date(g.dueDate).getTime()<now;
+      var due=g.dueDate?new Date(g.dueDate).toLocaleDateString():'no date';
+      return '<div class="cp-row"><div class="cp-row-main"><div class="cp-row-name">'+esc(pt)
+        +(g.status==='CLOSED'?' <span style="font-size:10px;color:#16a34a;font-weight:700">CLOSED</span>':overdue?' <span style="font-size:10px;color:#dc2626;font-weight:700">OVERDUE</span>':'')+'</div>'
+        +'<div style="font-size:12px;color:var(--text2);margin-top:2px">'+esc(g.measure)+' · due '+esc(due)+'</div></div>'
+        +(canEdit&&g.status==='OPEN'?'<button class="cp-log" onclick="medcrmCloseGap(\''+g.id+'\')">Close</button>':'')
+        +(canEdit&&g.status==='CLOSED'?'<button class="cp-rm" title="Reopen" onclick="medcrmReopenGap(\''+g.id+'\')">↺</button>':'')
+        +'</div>';
+    }).join('') : '<div class="empty-state">No care gaps recorded.</div>';
+    var addBtn=canEdit?'<div style="text-align:right;margin-bottom:10px"><button class="btn-primary" onclick="medcrmAddGap()">+ Add gap</button></div>':'';
+    showModal('Care gaps', addBtn+'<div class="cp-reg">'+body+'</div>', true);
+  };
+  window.medcrmAddGap=async function(){
+    var pts=[]; try{ pts=await api('/patients'); }catch(e){}
+    var ptOpts=(pts||[]).map(function(p){return '<option value="'+p.id+'">'+esc(p.lastName+', '+p.firstName+' ('+p.mrn+')')+'</option>';}).join('');
+    showModal('Add care gap',
+      '<div class="frm"><label>Patient</label><select id="gpPatient">'+ptOpts+'</select>'
+      +'<label>Measure / gap</label><input type="text" id="gpMeasure" placeholder="e.g. A1c overdue, BP uncontrolled">'
+      +'<label>Due date (optional)</label><input type="date" id="gpDue">'
+      +'<div style="text-align:right;margin-top:12px"><button class="btn-primary" onclick="medcrmSubmitGap()">Add</button></div>'
+      +'<div id="gpErr" style="color:#dc2626;font-size:12px;margin-top:8px"></div></div>', false);
+  };
+  window.medcrmSubmitGap=async function(){
+    var body={ patientId:document.getElementById('gpPatient').value, measure:document.getElementById('gpMeasure').value };
+    var d=document.getElementById('gpDue').value; if(d) body.dueDate=new Date(d).toISOString();
+    if(!body.patientId||!body.measure){ document.getElementById('gpErr').textContent='Pick a patient and describe the gap.'; return; }
+    try{ await api('/care/gaps',{method:'POST',body:body}); medcrmOpenGaps(); renderCareDashboard(); }
+    catch(e){ document.getElementById('gpErr').textContent=gated(e)?'You need patient-update permission.':'Could not add: '+e.message; }
+  };
+  window.medcrmCloseGap=async function(id){ try{ await api('/care/gaps/'+id,{method:'PATCH',body:{status:'CLOSED'}}); medcrmOpenGaps(); renderCareDashboard(); }catch(e){ alert('Could not close: '+e.message); } };
+  window.medcrmReopenGap=async function(id){ try{ await api('/care/gaps/'+id,{method:'PATCH',body:{status:'OPEN'}}); medcrmOpenGaps(); renderCareDashboard(); }catch(e){ alert('Could not reopen: '+e.message); } };
+
+  window.medcrmSubmitActivity=async function(id,model){
+    var minutesModels=['CHRONIC_CARE_MANAGEMENT','PRINCIPAL_CARE_MANAGEMENT','COMPLEX_CARE_MANAGEMENT','BEHAVIORAL_HEALTH_INTEGRATION'];
+    var body={}; var note=document.getElementById('acNote').value; if(note) body.note=note;
+    if(minutesModels.indexOf(model)>=0){ body.type='TIME_LOG'; body.minutes=parseInt(document.getElementById('acVal').value||'0',10); }
+    else if(model==='REMOTE_PATIENT_MONITORING'){ body.type='DEVICE_READING'; body.readingDays=parseInt(document.getElementById('acVal').value||'0',10); }
+    else { body.type=document.getElementById('acType').value; }
+    try{ await api('/care/enrollments/'+id+'/activities',{method:'POST',body:body}); closeForm(); medcrmOpenRegistry(model); renderPrograms(); }
+    catch(e){ document.getElementById('acErr').textContent=gated(e)?'You need patient-update permission.':'Could not save: '+e.message; }
+  };
+
 
 
 
