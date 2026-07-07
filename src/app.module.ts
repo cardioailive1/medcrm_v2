@@ -23,6 +23,7 @@ import { AnalyticsModule } from './analytics/analytics.module';
 import { AdminModule } from './admin/admin.module';
 import { ReportsModule } from './reports/reports.module';
 import { OrganizationModule } from './organization/organization.module';
+import { CareModule } from './care/care.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { JobsModule } from './jobs/jobs.module';
 import { HealthController } from './health/health.controller';
@@ -58,6 +59,7 @@ import { AuditInterceptor } from './common/interceptors/audit.interceptor';
     AdminModule,
     ReportsModule,
     OrganizationModule,
+    CareModule,
     ScheduleModule.forRoot(),
     JobsModule,
   ],
