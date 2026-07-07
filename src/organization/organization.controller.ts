@@ -15,8 +15,9 @@ export class OrganizationController {
     return this.org.get(u.organizationId);
   }
 
-  // Only admins (ORG_MANAGE) can change which care models the practice runs.
-  @RequirePermissions(Permission.ORG_MANAGE)
+  // Care-model selection is a practice-configuration task available to clinical staff
+  // (PATIENT_UPDATE), not just org admins — so any authorized user can pick their models.
+  @RequirePermissions(Permission.PATIENT_UPDATE)
   @Patch('care-models')
   updateCareModels(@CurrentUser() u: AuthUser, @Body() dto: UpdateCareModelsDto) {
     return this.org.updateCareModels(u.organizationId, dto);
