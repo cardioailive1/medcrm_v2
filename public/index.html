@@ -809,6 +809,10 @@ body{font-family:var(--font);background:var(--bg);color:var(--text1);font-size:1
 .rk-bar{flex:1;height:8px;background:var(--border);border-radius:4px;overflow:hidden}
 .rk-fill{height:100%;border-radius:4px;min-width:2px}
 .rk-v{font-size:12px;font-weight:700;color:var(--text1);width:28px;text-align:right}
+.reg-hint{font-size:10px;color:var(--text3);margin-top:4px;line-height:1.4}
+#pendingBanner{display:none;background:#fef3c7;color:#92400e;padding:10px 16px;font-size:13px;font-weight:500;text-align:center;border-bottom:1px solid #fde68a}
+.mbr-badge{font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px}
+.mbr-pending{background:#fef3c7;color:#92400e}.mbr-active{background:#dcfce7;color:#166534}.mbr-susp{background:#fee2e2;color:#991b1b}
 </style>
 </head>
 <body>
@@ -841,12 +845,13 @@ body{font-family:var(--font);background:var(--bg);color:var(--text1);font-size:1
       <div id="loginError" class="login-error"></div>
     </form>
     <form id="registerForm" style="display:none">
-      <div class="login-field"><label for="regOrg">Organization name</label><input id="regOrg" type="text" required placeholder="City Medical Center"/></div>
+      <div class="login-field"><label for="regOrg">Organization name</label><input id="regOrg" type="text" required placeholder="City Medical Center"/><div class="reg-hint">Used only when your email domain is new here. If your organization already exists, you'll join it pending admin approval.</div></div>
       <div class="login-row">
         <div class="login-field"><label for="regFirst">First name</label><input id="regFirst" type="text" required placeholder="Sarah"/></div>
         <div class="login-field"><label for="regLast">Last name</label><input id="regLast" type="text" required placeholder="Harper"/></div>
       </div>
       <div class="login-field"><label for="regEmail">Work email</label><input id="regEmail" type="email" autocomplete="username" required placeholder="you@clinic.org"/></div>
+      <div class="login-field"><label for="regRole">Your role</label><select id="regRole"><option value="PHYSICIAN">Physician (MD)</option><option value="NURSE">Nurse</option><option value="STAFF" selected>Clinical staff</option><option value="BILLING">Finance / Billing</option></select><div class="reg-hint">The first account on a domain becomes the admin/owner. Others need approval for this role.</div></div>
       <div class="login-field"><label for="regPassword">Password</label><input id="regPassword" type="password" autocomplete="new-password" required placeholder="At least 12 characters"/>
         <div class="pw-meter"><div id="pwBar" class="pw-bar"></div></div>
         <div id="pwReqs" class="pw-reqs"><span data-req="len">12+ chars</span><span data-req="upper">A-Z</span><span data-req="lower">a-z</span><span data-req="num">0-9</span><span data-req="sym">symbol</span></div>
@@ -861,6 +866,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text1);font-size:1
   </div>
 </div>
 <div class="app">
+<div id="pendingBanner"></div>
 
 <!-- ═══════════ SIDEBAR ═══════════ -->
 <nav class="sidebar">
@@ -3403,6 +3409,8 @@ body{font-family:var(--font);background:var(--bg);color:var(--text1);font-size:1
     if (nm) nm.textContent = (me.firstName || '') + ' ' + (me.lastName || '');
     if (rl) rl.textContent = (me.role || '') + (me.organization ? ' · ' + me.organization.name : '');
     if (av) av.textContent = ini(me.firstName, me.lastName);
+    var pb=document.getElementById('pendingBanner');
+    if(pb){ if(me.status==='PENDING'){ pb.style.display='block'; pb.textContent='Your account is awaiting approval from your organization admin. You have limited access until then.'; } else if(me.status==='SUSPENDED'){ pb.style.display='block'; pb.textContent='Your account is suspended. Contact your organization admin.'; } else { pb.style.display='none'; } }
     window.__me = me; return me;
   }
 
@@ -3463,18 +3471,37 @@ body{font-family:var(--font);background:var(--bg);color:var(--text1);font-size:1
   }
 
   /* ---------------- team ---------------- */
+  var ROLE_LABELS = { ADMIN:'Admin', PHYSICIAN:'Physician (MD)', NURSE:'Nurse', STAFF:'Clinical staff', BILLING:'Finance / Billing' };
+  function roleLabel(r){ return ROLE_LABELS[r] || r; }
   async function loadTeam() {
     var tb = document.getElementById('teamTbody'); if (!tb) return;
     tEmpty(tb, 5, 'Loading…');
-    try {
-      var l = await api('/users'); window.__users = l;
-      if (!l.length) { tEmpty(tb, 5, 'No team members.'); return; }
-      tb.innerHTML = l.map(function (u) {
-        return '<tr><td><div class="pt-name"><div class="pt-av" style="background:#e8f3fb;color:#1a6fa8">' + esc(ini(u.firstName, u.lastName)) + '</div><div><div class="pt-nm">' + esc(u.firstName) + ' ' + esc(u.lastName) + '</div><div class="pt-id">' + esc(u.email) + '</div></div></div></td>' +
-          '<td>' + esc(u.role) + '</td><td>—</td><td><span class="status-badge ' + (u.isActive ? 'badge-green">Active' : 'badge-gray">Inactive') + '</span></td><td><button class="action-btn" onclick="medcrmEditUser(\'' + u.id + '\')">Edit</button></td></tr>';
-      }).join('');
-    } catch (e) { tEmpty(tb, 5, 'Could not load team: ' + e.message); }
+    var canManage = (((window.__me&&window.__me.permissions)||[]).indexOf('user:manage')>=0);
+    var l = [];
+    try { l = await api('/organization/members'); }
+    catch (e) { try { l = await api('/users'); } catch(x){ tEmpty(tb,5,'Could not load team: '+e.message); return; } }
+    window.__users = l;
+    if (!l.length) { tEmpty(tb, 5, 'No team members.'); return; }
+    tb.innerHTML = l.map(function (u) {
+      var st = u.status || (u.isActive ? 'ACTIVE' : 'SUSPENDED');
+      var badge = st==='PENDING'?'<span class="mbr-badge mbr-pending">Pending</span>':st==='SUSPENDED'?'<span class="mbr-badge mbr-susp">Suspended</span>':'<span class="mbr-badge mbr-active">Active</span>';
+      var roleCell = canManage
+        ? '<select onchange="medcrmSetMemberRole(\''+u.id+'\',this.value)"><option value="ADMIN"'+(u.role==='ADMIN'?' selected':'')+'>Admin</option><option value="PHYSICIAN"'+(u.role==='PHYSICIAN'?' selected':'')+'>Physician (MD)</option><option value="NURSE"'+(u.role==='NURSE'?' selected':'')+'>Nurse</option><option value="STAFF"'+(u.role==='STAFF'?' selected':'')+'>Clinical staff</option><option value="BILLING"'+(u.role==='BILLING'?' selected':'')+'>Finance / Billing</option></select>'
+        : esc(roleLabel(u.role));
+      var actions = '';
+      if (canManage) {
+        if (st==='PENDING') actions = '<button class="action-btn" onclick="medcrmApproveMember(\''+u.id+'\')">Approve</button>';
+        else if (st==='ACTIVE') actions = '<button class="action-btn" onclick="medcrmSuspendMember(\''+u.id+'\')">Suspend</button>';
+        else actions = '<button class="action-btn" onclick="medcrmApproveMember(\''+u.id+'\')">Reactivate</button>';
+      }
+      return '<tr><td><div class="pt-name"><div class="pt-av" style="background:#e8f3fb;color:#1a6fa8">' + esc(ini(u.firstName, u.lastName)) + '</div><div><div class="pt-nm">' + esc(u.firstName) + ' ' + esc(u.lastName) + '</div><div class="pt-id">' + esc(u.email) + '</div></div></div></td>' +
+        '<td>' + roleCell + '</td><td>—</td><td>' + badge + '</td><td>' + actions + '</td></tr>';
+    }).join('');
   }
+  async function memberPatch(id, body){ try{ await api('/organization/members/'+id,{method:'PATCH',body:body}); loadTeam(); }catch(e){ alert(gated(e)?'Only admins can manage members.':'Failed: '+e.message); } }
+  window.medcrmApproveMember=function(id){ memberPatch(id,{status:'ACTIVE'}); };
+  window.medcrmSuspendMember=function(id){ if(confirm('Suspend this member?')) memberPatch(id,{status:'SUSPENDED'}); };
+  window.medcrmSetMemberRole=function(id,role){ memberPatch(id,{role:role}); };
 
   /* ---------------- appointments calendar ---------------- */
   async function loadAppointments() {
@@ -4016,6 +4043,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text1);font-size:1
         lastName: document.getElementById('regLast').value.trim(),
         email: document.getElementById('regEmail').value.trim(),
         password: pw, acceptedTerms: true,
+        requestedRole: (document.getElementById('regRole')||{}).value || 'STAFF',
       }) });
       if (!res.ok) { var m = 'Could not create account'; try { var j = await res.json(); if (j && j.message) m = Array.isArray(j.message) ? j.message.join(', ') : j.message; } catch (x) {} throw new Error(m); }
       var d = await res.json(); sT(d.accessToken, d.refreshToken); hideLogin(); startIdle(); await bootstrap();
@@ -4127,7 +4155,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text1);font-size:1
   var careCfg = null;
   function cmName(id){ var m=CARE_MODELS.filter(function(x){return x.id===id;})[0]; return m?m.name:id; }
   function cmDesc(id){ var m=CARE_MODELS.filter(function(x){return x.id===id;})[0]; return m?m.desc:''; }
-  function cmCanEdit(){ return (((window.__me&&window.__me.permissions)||[]).indexOf('patient:update')>=0); }
+  function cmCanEdit(){ return (((window.__me&&window.__me.permissions)||[]).indexOf('org:manage')>=0); }
   async function loadCareCfg(force){
     if(careCfg && !force) return careCfg;
     try{ careCfg = await api('/organization'); }
@@ -4186,7 +4214,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text1);font-size:1
       if(document.getElementById('careBody')) renderCareModels('careBody');
       var sc=document.getElementById('sec-caremodels');
       if(sc&&sc.classList.contains('active-ss')) renderCareModels('caremodelsBody');
-    }catch(e){ var er=document.getElementById('cmErr'); if(er) er.textContent=gated(e)?'You need patient-update permission to change care models.':('Could not save: '+e.message); }
+    }catch(e){ var er=document.getElementById('cmErr'); if(er) er.textContent=gated(e)?'Only admins can change care models.':('Could not save: '+e.message); }
   };
   async function careOnboarding(){
     try{
