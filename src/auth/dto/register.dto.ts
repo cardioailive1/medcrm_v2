@@ -1,4 +1,5 @@
-import { Equals, IsBoolean, IsEmail, IsString, Matches, MaxLength, MinLength } from 'class-validator';
+import { Equals, IsBoolean, IsEmail, IsEnum, IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator';
+import { Role } from '@prisma/client';
 
 // Password complexity aligned with NIST 800-63B / HIPAA §164.308(a)(5)(ii)(D):
 // 12+ chars with upper, lower, number, and symbol. Length is the primary strength driver.
@@ -31,4 +32,10 @@ export class RegisterDto {
   @IsBoolean()
   @Equals(true, { message: 'You must acknowledge the terms and PHI-handling notice to create an account.' })
   acceptedTerms: boolean;
+
+  // Requested role when JOINING an existing organization (domain already registered).
+  // Ignored for the first account on a domain, which becomes the ADMIN/owner.
+  @IsOptional()
+  @IsEnum(Role)
+  requestedRole?: Role;
 }

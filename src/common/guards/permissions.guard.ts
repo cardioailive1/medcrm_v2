@@ -18,7 +18,8 @@ export class PermissionsGuard implements CanActivate {
     const { user } = context.switchToHttp().getRequest();
     if (!user) throw new ForbiddenException('Unauthenticated');
 
-    const granted = permissionsForRole(user.role as Role);
+    // Pending / suspended accounts carry no permissions until an admin approves them.
+    const granted = user.status === 'ACTIVE' ? permissionsForRole(user.role as Role) : [];
     const ok = required.every((p) => granted.includes(p));
     if (!ok) throw new ForbiddenException('Insufficient permissions');
     return true;

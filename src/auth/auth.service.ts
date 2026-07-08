@@ -35,27 +35,52 @@ export class AuthService {
     if (existing) throw new ConflictException('Email already registered');
 
     const passwordHash = await argon2.hash(dto.password, { type: argon2.argon2id });
+    const domain = (dto.email.split('@')[1] ?? '').toLowerCase();
 
-    // First user of a new organization becomes its ADMIN.
-    const org = await this.prisma.organization.create({
-      data: {
-        name: dto.organizationName,
-        users: {
-          create: {
-            email: dto.email,
-            passwordHash,
-            firstName: dto.firstName,
-            lastName: dto.lastName,
-            role: Role.ADMIN,
-            passwordChangedAt: new Date(),
+    // An organization is keyed to an email domain. The FIRST account on a domain
+    // creates the org and becomes its ADMIN/owner (active immediately). Later accounts
+    // on the same domain JOIN it as PENDING with a requested role, awaiting owner approval.
+    const org = domain ? await this.prisma.organization.findFirst({ where: { domain } }) : null;
+
+    if (!org) {
+      const created = await this.prisma.organization.create({
+        data: {
+          name: dto.organizationName || domain || 'My Organization',
+          domain: domain || null,
+          users: {
+            create: {
+              email: dto.email,
+              passwordHash,
+              firstName: dto.firstName,
+              lastName: dto.lastName,
+              role: Role.ADMIN,
+              status: 'ACTIVE',
+              passwordChangedAt: new Date(),
+            },
           },
         },
-      },
-      include: { users: true },
-    });
+        include: { users: true },
+      });
+      const owner = created.users[0];
+      await this.audit('ACCOUNT_CREATED', { userId: owner.id, organizationId: created.id, ip: ctx.ip });
+      return this.issueSession(owner);
+    }
 
-    const user = org.users[0];
-    await this.audit('ACCOUNT_CREATED', { userId: user.id, organizationId: org.id, ip: ctx.ip });
+    // Joining an existing organization -> pending approval, no privileges yet.
+    const requested = dto.requestedRole && Object.values(Role).includes(dto.requestedRole) ? dto.requestedRole : Role.STAFF;
+    const user = await this.prisma.user.create({
+      data: {
+        email: dto.email,
+        passwordHash,
+        firstName: dto.firstName,
+        lastName: dto.lastName,
+        role: requested,
+        status: 'PENDING',
+        passwordChangedAt: new Date(),
+        organizationId: org.id,
+      },
+    });
+    await this.audit('ACCOUNT_PENDING', { userId: user.id, organizationId: org.id, ip: ctx.ip });
     return this.issueSession(user);
   }
 
@@ -145,7 +170,8 @@ export class AuthService {
       firstName: user.firstName,
       lastName: user.lastName,
       role: user.role,
-      permissions: permissionsForRole(user.role),
+      status: user.status,
+      permissions: user.status === 'ACTIVE' ? permissionsForRole(user.role) : [],
       organization: user.organization,
     };
   }
@@ -173,9 +199,9 @@ export class AuthService {
     }
   }
 
-  private async issueSession(user: { id: string; email: string; role: Role; organizationId: string }) {
+  private async issueSession(user: { id: string; email: string; role: Role; status?: string; organizationId: string }) {
     const accessToken = await this.jwt.signAsync(
-      { sub: user.id, email: user.email, role: user.role, organizationId: user.organizationId },
+      { sub: user.id, email: user.email, role: user.role, status: user.status ?? 'ACTIVE', organizationId: user.organizationId },
       {
         secret: this.config.get<string>('JWT_ACCESS_SECRET'),
         expiresIn: `${this.config.get<string>('JWT_ACCESS_TTL') ?? '900'}s`,
