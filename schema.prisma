@@ -40,6 +40,7 @@ enum PatientStatus {
 model Organization {
   id                   String             @id @default(cuid())
   name                 String
+  domain               String?            @unique
   tier                 Tier               @default(FREE)
   subscriptionStatus   SubscriptionStatus @default(INACTIVE)
   stripeCustomerId     String?            @unique
@@ -79,6 +80,7 @@ model User {
   firstName      String
   lastName       String
   role           Role           @default(STAFF)
+  status         UserStatus     @default(ACTIVE)
   isActive       Boolean        @default(true)
   // Security-Rule technical safeguards: brute-force lockout + login tracking
   failedLoginCount Int          @default(0)
@@ -513,4 +515,10 @@ enum ActivityType {
 enum GapStatus {
   OPEN
   CLOSED
+}
+
+enum UserStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
 }
