@@ -2086,7 +2086,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text1);font-size:1
               <div class="card" style="padding:14px 16px"><div style="font-weight:600;font-size:13px;margin-bottom:4px">Orthanc PACS · DICOM</div><div style="font-size:11px;color:var(--text3);margin-bottom:10px">Imaging studies, DICOMweb WADO-RS</div><span class="status-badge badge-green">Connected</span></div>
               <div class="card" style="padding:14px 16px"><div style="font-weight:600;font-size:13px;margin-bottom:4px">Cerner ADT · HL7 v2</div><div style="font-size:11px;color:var(--text3);margin-bottom:10px">Admission/discharge/transfer feed</div><span class="status-badge badge-green">Connected</span></div>
               <div class="card" style="padding:14px 16px"><div style="font-weight:600;font-size:13px;margin-bottom:4px">Twilio Video · Telehealth</div><div style="font-size:11px;color:var(--text3);margin-bottom:10px">WebRTC video sessions, recordings</div><span class="status-badge badge-green">Connected</span></div>
-              <div class="card" style="padding:14px 16px;cursor:pointer" onclick="medcrmShowPlans()"><div style="font-weight:600;font-size:13px;margin-bottom:4px">Subscription &amp; Plans</div><div style="font-size:11px;color:var(--text3);margin-bottom:10px">View plans, upgrade, or manage billing</div><span class="status-badge badge-blue">View plans →</span></div>
+              <div class="card" id="plansCard" style="padding:14px 16px;cursor:pointer" onclick="medcrmShowPlans()"><div style="font-weight:600;font-size:13px;margin-bottom:4px">Subscription &amp; Plans</div><div style="font-size:11px;color:var(--text3);margin-bottom:10px">View plans, upgrade, or manage billing</div><span class="status-badge badge-blue">View plans →</span></div>
             </div>
           </div>
           <div class="settings-section" id="sec-compliance">
@@ -3998,6 +3998,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text1);font-size:1
   async function bootstrap() {
     try { await loadMe(); } catch (e) { showLogin(); return; }
     clearStatic();
+    applyBillingVisibility();
     careOnboarding();
     var active = document.querySelector('.page.active');
     loadPage(active ? active.id : 'dashboard');
@@ -4139,7 +4140,16 @@ body{font-family:var(--font);background:var(--bg);color:var(--text1);font-size:1
     showModal('Plans & Billing', '<div class="plan-grid">' + cards + '</div>' +
       '<div style="font-size:10px;color:var(--text3);text-align:center;margin-top:12px">Prices are per active provider, per month. Enterprise is custom-quoted. You\'ll complete payment securely on Stripe.</div>', true);
   }
-  window.medcrmShowPlans = showPlans;
+  // ---- Billing toggle: set to false to hide all plans/upgrade UI during testing ----
+  var BILLING_ENABLED = false;
+  function applyBillingVisibility(){
+    var show = BILLING_ENABLED ? '' : 'none';
+    var ub=document.getElementById('upgradeBtn'); if(ub) ub.style.display=show;
+    var pc=document.getElementById('plansCard'); if(pc) pc.style.display=show;
+  }
+  window.applyBillingVisibility = applyBillingVisibility;
+  window.medcrmShowPlans = function(){ if(!BILLING_ENABLED){ return; } return showPlans(); };
+  window.__realShowPlans = showPlans;
   /* ---- Care Management ---- */
   var CARE_MODELS = [
     { id:'VALUE_BASED_CARE', name:'Value-Based Care', desc:'Reimbursement tied to outcomes and quality. The recommended default model.' },
@@ -4259,9 +4269,9 @@ body{font-family:var(--font);background:var(--bg);color:var(--text1);font-size:1
         + kpi('Telehealth encounters', (a.telehealthSessions||0), 'Access / continuity')
         + '</div>';
     } else if(gatedA){
-      quality='<div class="vbc-lock"><div class="vbc-lock-t">Value-based analytics are a Pro feature</div>'
-        +'<div class="vbc-lock-s">Quality scores, show-rate, and outcome trends for your attributed population unlock on Pro.</div>'
-        +'<button class="btn-primary" style="margin-top:10px" onclick="medcrmShowPlans()">View plans</button></div>';
+      quality='<div class="vbc-lock"><div class="vbc-lock-t">Value-based analytics</div>'
+        +'<div class="vbc-lock-s">Quality scores, show-rate, and outcome trends appear here once analytics data is available'+(BILLING_ENABLED?' on the Pro plan':'')+'.</div>'
+        +(BILLING_ENABLED?'<button class="btn-primary" style="margin-top:10px" onclick="medcrmShowPlans()">View plans</button>':'')+'</div>';
     } else {
       quality='<div class="vbc-lock"><div class="vbc-lock-s">Quality metrics will appear here once there is visit and survey data.</div></div>';
     }
