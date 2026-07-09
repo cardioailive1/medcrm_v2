@@ -1,4 +1,5 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateActivityDto } from './create-activity.dto';
 import { UpdateAgentDto } from './update-agent.dto';
@@ -73,7 +74,7 @@ export class AgentsService {
       where: { organizationId_key: { organizationId, key } },
       data: {
         ...(dto.enabled != null ? { enabled: dto.enabled } : {}),
-        ...(dto.config != null ? { config: dto.config } : {}),
+        ...(dto.config != null ? { config: dto.config as Prisma.InputJsonValue } : {}),
         integrationReady,
       },
     });
