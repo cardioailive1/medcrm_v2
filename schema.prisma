@@ -52,6 +52,7 @@ model Organization {
   careEnrollments      CareEnrollment[]
   careActivities       CareActivity[]
   careGaps             CareGap[]
+  agents               Agent[]
   users                User[]
   patients             Patient[]
   auditLogs            AuditLog[]
@@ -521,4 +522,28 @@ enum UserStatus {
   PENDING
   ACTIVE
   SUSPENDED
+}
+
+model Agent {
+  id                  String       @id @default(cuid())
+  organization        Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organizationId      String
+  key                 String
+  name                String
+  category            String
+  description         String
+  enabled             Boolean      @default(false)
+  // Clinical / regulatory agents must not act until a real integration is configured AND validated.
+  requiresIntegration Boolean      @default(false)
+  integrationReady    Boolean      @default(false)
+  // Integration ports the org fills in (FHIR base URL, X12/EDI endpoint, payer API, etc.)
+  config              Json?
+  lastRunAt           DateTime?
+  runCount            Int          @default(0)
+  lastResult          String?
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+
+  @@unique([organizationId, key])
+  @@index([organizationId])
 }
