@@ -1107,14 +1107,14 @@ body{font-family:var(--font);background:var(--bg);color:var(--text1);font-size:1
           <div class="video-stage">
             <div class="video-main">
               <div class="video-avatar-wrap">
-                <div class="video-av-large">JW</div>
-                <div class="video-name">James Wilson</div>
-                <div class="video-status">Primary Care · Follow-up</div>
+                <div class="video-av-large" id="thAvatar">—</div>
+                <div class="video-name" id="thName">No active session</div>
+                <div class="video-status" id="thStatus">Start a visit from the queue</div>
               </div>
             </div>
             <div class="pip"><div class="pip-av">DH</div></div>
-            <div class="call-timer"><span class="rec-dot"></span><span id="callTimer">00:08:24</span></div>
-            <div class="live-badge">● LIVE</div>
+            <div class="call-timer" id="thTimer" style="display:none"><span class="rec-dot"></span><span id="callTimer">00:00:00</span></div>
+            <div class="live-badge" id="thLive" style="display:none">● LIVE</div>
             <div class="video-controls">
               <button class="vc-btn on" title="Mute"><svg width="16" height="16" viewBox="0 0 16 16" fill="white"><path d="M8 1a3 3 0 013 3v4a3 3 0 01-6 0V4a3 3 0 013-3zM4 8a4 4 0 008 0M8 12v3"/></svg></button>
               <button class="vc-btn on" title="Camera"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="white" stroke-width="1.5"><rect x="1" y="4" width="10" height="8" rx="2"/><path d="M11 6l4-2v8l-4-2V6z"/></svg></button>
@@ -1148,6 +1148,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text1);font-size:1
               <div class="vital-trend delta-down" style="font-size:10px">▲ Above target</div>
             </div>
           </div>
+          <div style="font-size:10px;color:var(--text3);margin-top:8px;text-align:center">Video is representational — connect a provider (e.g. Twilio/WebRTC) to enable live calls. Scheduling & queue below are live.</div>
         </div>
 
         <!-- Queue panel -->
@@ -1194,7 +1195,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text1);font-size:1
 
       <!-- Past telehealth sessions -->
       <div class="card">
-        <div class="card-header"><span class="card-title">Recent Telehealth Sessions</span><button class="btn-sm primary">Schedule New</button></div>
+        <div class="card-header"><span class="card-title">Recent Telehealth Sessions</span><button class="btn-sm primary" onclick="medcrmScheduleTelehealth()">Schedule New</button></div>
         <table class="data-table">
           <thead><tr><th>Patient</th><th>Provider</th><th>Date</th><th>Duration</th><th>Type</th><th>Recording</th><th>Status</th><th>Actions</th></tr></thead>
           <tbody id="sessionsTbody"></tbody>
@@ -3552,6 +3553,14 @@ body{font-family:var(--font);background:var(--bg);color:var(--text1);font-size:1
         }).join('');
       } catch (e) { q.innerHTML = empty(gated(e) ? 'Telehealth requires the PRO plan.' : 'Could not load: ' + e.message); }
     }
+    // Drive the video stage from real session data (representational preview).
+    try {
+      var all = await api('/telehealth/queue');
+      var active = (all||[]).filter(function(x){return x.status==='IN_SESSION';})[0] || (all||[])[0];
+      var av=document.getElementById('thAvatar'), nm=document.getElementById('thName'), stt=document.getElementById('thStatus'), lv=document.getElementById('thLive'), tm=document.getElementById('thTimer');
+      if(active && nm){ av.textContent=esc(ini.apply(null,(active.patientName||'? ?').split(' '))); nm.textContent=esc(active.patientName); stt.textContent=esc((active.department||'')+(active.type?' · '+active.type:'')||'Telehealth visit'); var live=active.status==='IN_SESSION'; if(lv) lv.style.display=live?'':'none'; if(tm) tm.style.display=live?'':'none'; }
+      else if(nm){ av.textContent='—'; nm.textContent='No active session'; stt.textContent='Schedule a visit or add one to the queue'; if(lv) lv.style.display='none'; if(tm) tm.style.display='none'; }
+    } catch(e){}
     var tb = document.getElementById('sessionsTbody');
     if (tb) {
       tEmpty(tb, 8, 'Loading…');
@@ -4478,6 +4487,31 @@ body{font-family:var(--font);background:var(--bg);color:var(--text1);font-size:1
     window.location.href = 'mailto:sales@medcrm.example?subject=MedCRM%20Enterprise%20inquiry';
   };
 
+  window.medcrmScheduleTelehealth = async function(){
+    var pts=[]; try{ pts=await api('/patients'); }catch(e){}
+    var ptOpts='<option value="">— type a name below —</option>'+(pts||[]).map(function(p){return '<option>'+esc(p.firstName+' '+p.lastName)+'</option>';}).join('');
+    showModal('Schedule telehealth visit',
+      '<div class="frm"><label>Patient (pick or type)</label><select id="thPPick" onchange="if(this.value)document.getElementById(\'thPName\').value=this.value">'+ptOpts+'</select>'
+      +'<input type="text" id="thPName" placeholder="Patient name" style="margin-top:6px">'
+      +'<label>Provider</label><input type="text" id="thProv" placeholder="Dr. Harper">'
+      +'<label>Department</label><input type="text" id="thDept" placeholder="Primary Care">'
+      +'<label>Type</label><input type="text" id="thType" placeholder="Follow-up / New patient">'
+      +'<label>Status</label><select id="thStat"><option value="SCHEDULED">Scheduled</option><option value="WAITING">Waiting (add to queue)</option></select>'
+      +'<label>Scheduled time (optional)</label><input type="datetime-local" id="thWhen">'
+      +'<div style="text-align:right;margin-top:12px"><button class="btn-primary" onclick="medcrmSubmitTelehealth()">Schedule</button></div>'
+      +'<div id="thErr" style="color:#dc2626;font-size:12px;margin-top:8px"></div></div>', false);
+  };
+  window.medcrmSubmitTelehealth = async function(){
+    var name=document.getElementById('thPName').value.trim();
+    if(!name){ document.getElementById('thErr').textContent='Enter a patient name.'; return; }
+    var body={ patientName:name, status:document.getElementById('thStat').value };
+    var pv=document.getElementById('thProv').value.trim(); if(pv) body.providerName=pv;
+    var dp=document.getElementById('thDept').value.trim(); if(dp) body.department=dp;
+    var tp=document.getElementById('thType').value.trim(); if(tp) body.type=tp;
+    var wn=document.getElementById('thWhen').value; if(wn) body.scheduledAt=new Date(wn).toISOString();
+    try{ await api('/telehealth',{method:'POST',body:body}); closeForm(); loadTelehealth(); }
+    catch(e){ document.getElementById('thErr').textContent=gated(e)?'Telehealth requires the PRO plan.':'Could not schedule: '+e.message; }
+  };
   window.medcrmAddPatient = window.medcrmAddPatientForm;
 })();
 
