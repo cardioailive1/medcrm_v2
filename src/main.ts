@@ -1,10 +1,9 @@
-import { NestFactory, Reflector } from '@nestjs/core';
+import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import { AppModule } from './app.module';
-import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { rawBody: true });
@@ -30,7 +29,6 @@ async function bootstrap() {
   );
 
   // Global authentication; routes opt out with @Public()
-  app.useGlobalGuards(new JwtAuthGuard(app.get(Reflector)));
 
   // OpenAPI / Swagger docs at /api/docs (bearer-auth aware)
   const swaggerConfig = new DocumentBuilder()
