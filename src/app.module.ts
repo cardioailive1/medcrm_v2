@@ -28,6 +28,7 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { JobsModule } from './jobs/jobs.module';
 import { HealthController } from './health/health.controller';
 
+import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
 import { PermissionsGuard } from './common/guards/permissions.guard';
 import { SubscriptionGuard } from './common/guards/subscription.guard';
@@ -66,6 +67,8 @@ import { AuditInterceptor } from './common/interceptors/audit.interceptor';
   controllers: [HealthController],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },
+    // JwtAuthGuard MUST be registered before the permission guards so it populates req.user first.
+    { provide: APP_GUARD, useClass: JwtAuthGuard },
     // order matters: roles -> permissions -> subscription (run after JwtAuthGuard populates req.user)
     { provide: APP_GUARD, useClass: RolesGuard },
     { provide: APP_GUARD, useClass: PermissionsGuard },
