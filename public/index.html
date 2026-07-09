@@ -1267,10 +1267,10 @@ body{font-family:var(--font);background:var(--bg);color:var(--text1);font-size:1
     <!-- ══════ AI AGENTS ══════ -->
     <div class="page" id="agents">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
-        <div style="font-size:13px;color:var(--text2)">8 agents deployed · <strong style="color:var(--green)">7 active</strong> · <strong style="color:var(--amber)">1 idle</strong></div>
+        <div style="font-size:13px;color:var(--text2)"><strong style="color:var(--green)">2 live agents</strong> · <strong style="color:var(--text3)">6 in preview</strong></div>
         <div style="margin-left:auto;display:flex;gap:8px">
-          <button class="btn-sm">Configure</button>
-          <button class="btn-primary"><svg width="12" height="12" viewBox="0 0 12 12"><path d="M6 1v10M1 6h10" stroke="white" stroke-width="1.8" stroke-linecap="round"/></svg>Deploy Agent</button>
+          <button class="btn-sm" onclick="medcrmOpenAgent('agent-admin')">Configure</button>
+          <button class="btn-primary" onclick="medcrmDeployAgent()"><svg width="12" height="12" viewBox="0 0 12 12"><path d="M6 1v10M1 6h10" stroke="white" stroke-width="1.8" stroke-linecap="round"/></svg>Deploy Agent</button>
         </div>
       </div>
 
@@ -1352,7 +1352,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text1);font-size:1
       <div class="agent-log">
         <div class="log-header">
           <div class="log-title"><span class="pulse-ring active" style="margin-right:4px"></span>Live Agent Activity Log</div>
-          <div style="display:flex;gap:8px"><button class="btn-sm">Pause all</button><button class="btn-sm primary">Export log</button></div>
+          <div style="display:flex;gap:8px"><button class="btn-sm" onclick="medcrmToast&&medcrmToast()">Pause all</button><button class="btn-sm primary" onclick="medcrmExportAgentLog()">Export log</button></div>
         </div>
         <div class="log-body" id="agentLog">
           <div class="log-line"><span class="log-time">09:51:04</span><span class="log-source ls-triage">TRIAGE</span><span class="log-msg">Flagged <span class="hi">Priya Sharma #PT-00502</span> — BP 158/96, headache + blurred vision → severity score 8.4/10 → escalated to Dr. Harper</span></div>
@@ -3629,11 +3629,138 @@ body{font-family:var(--font);background:var(--bg);color:var(--text1);font-size:1
     var m = { TRIAGE: 'ls-triage', LAB: 'ls-lab', BILLING: 'ls-billing', 'FOLLOW-UP': 'ls-followup', PRIOR: 'ls-prior', SCHEDULE: 'ls-schedule', ADMIN: 'ls-admin', REPORT: 'ls-report' };
     return m[s] || 'ls-system';
   }
+  /* ---- Agents (legacy preview helpers kept for safety) ---- */
+  window.medcrmOpenAgent = function(pageId){
+    var nav=document.querySelector('.nav-item[onclick*="goto(\''+pageId+'\'"]');
+    if(nav){ nav.click(); } else { try{ goto(pageId,null); }catch(e){} }
+  };
+  window.medcrmAgentPreview = function(name){
+    showModal(esc(name), '<div style="font-size:13px;color:var(--text2);line-height:1.6">This agent is a <b>representational preview</b> on the product roadmap — the interface shows how it will work, but it isn\'t connected to a live backend yet.<br><br>The two fully-functional agents today are the <b>Administrative Task Agent</b> and the <b>Reporting Agent</b> — open either from the Agents grid or the left nav.</div>', false);
+  };
+  window.medcrmDeployAgent = function(){
+    showModal('Agents', '<div style="font-size:13px;color:var(--text2);line-height:1.6;margin-bottom:12px">Live agents you can open now:</div>'
+      +'<div class="frm"><button class="btn-primary" style="width:100%;margin-bottom:8px" onclick="closeForm();medcrmOpenAgent(\'agent-admin\')">Open Administrative Task Agent</button>'
+      +'<button class="btn-primary" style="width:100%" onclick="closeForm();medcrmOpenAgent(\'agent-reports\')">Open Reporting Agent</button></div>'
+      +'<div style="font-size:11px;color:var(--text3);margin-top:12px">Additional agents (triage, follow-up, prior-auth, lab, billing, scheduler) are on the roadmap and shown as previews.</div>', false);
+  };
+  window.medcrmExportAgentLog = function(){
+    var rows=(window.__agentLog||[]);
+    if(!rows.length){ alert('No activity to export yet.'); return; }
+    var csv='time,source,message\n'+rows.map(function(a){return '"'+new Date(a.createdAt).toISOString()+'","'+(a.source||'').replace(/"/g,'""')+'","'+(a.message||'').replace(/"/g,'""')+'"';}).join('\n');
+    var blob=new Blob([csv],{type:'text/csv'}); var url=URL.createObjectURL(blob);
+    var a=document.createElement('a'); a.href=url; a.download='agent-activity.csv'; a.click(); URL.revokeObjectURL(url);
+  };
+  window.medcrmToast = function(){ /* pause-all is representational */ };
+
+  async function setupAgentCards(){
+    var cards=document.querySelectorAll('#agents .agent-card'); if(!cards.length) return;
+    // pull real stats for the two live agents
+    var adminN=null, repN=null;
+    try{ var a=await api('/admin/summary'); adminN=(a&&(a.tasksAutomated!=null?a.tasksAutomated:a.total))||0; }catch(e){}
+    try{ var r=await api('/reports/summary'); repN=(r&&(r.reportsGenerated!=null?r.reportsGenerated:r.total))||0; }catch(e){}
+    cards.forEach(function(card){
+      var name=((card.querySelector('.agent-name')||{}).textContent||'').trim();
+      var badge=card.querySelector('.agent-footer .status-badge');
+      var statStrong=card.querySelector('.agent-stat strong');
+      if(name.indexOf('Administrative Task')>=0){
+        card.style.cursor='pointer'; card.onclick=function(){medcrmOpenAgent('agent-admin');};
+        if(badge){ badge.className='status-badge badge-green'; badge.style.fontSize='9px'; badge.textContent='Live · Open →'; }
+        if(statStrong && adminN!=null) statStrong.textContent=adminN;
+      } else if(name.indexOf('Reporting Agent')>=0){
+        card.style.cursor='pointer'; card.onclick=function(){medcrmOpenAgent('agent-reports');};
+        if(badge){ badge.className='status-badge badge-teal'; badge.style.fontSize='9px'; badge.textContent='Live · Open →'; }
+        if(statStrong && repN!=null) statStrong.textContent=repN;
+      } else {
+        card.style.cursor='pointer'; card.classList.remove('running'); card.style.opacity='0.72';
+        card.onclick=(function(nm){return function(){medcrmAgentPreview(nm);};})(name);
+        if(badge){ badge.className='status-badge badge-gray'; badge.style.fontSize='9px'; badge.textContent='Preview'; }
+        if(statStrong) statStrong.textContent='—';
+        var pr=card.querySelector('.pulse-ring'); if(pr) pr.className='pulse-ring idle';
+      }
+    });
+  }
+  window.setupAgentCards = setupAgentCards;
+
+  /* ---- Agents: fully wired to backend ---- */
+  var AGENT_META = {
+    followup:  {icon:'#0d9488', bg:'#e6faf8'}, scheduler:{icon:'#64748b', bg:'#f1f5f9'},
+    admin:     {icon:'#4338ca', bg:'#eef2ff'}, reporting:{icon:'#0891b2', bg:'#ecfeff'},
+    triage:    {icon:'#dc2626', bg:'#fef2f2'}, lab:      {icon:'#d97706', bg:'#fffbeb'},
+    priorauth: {icon:'#7c3aed', bg:'#f5f3ff'}, billing:  {icon:'#1a6fa8', bg:'#e8f3fb'}
+  };
+  window.__agents = [];
+  async function renderAgentGrid(){
+    var grid=document.querySelector('#agents .agent-grid'); if(!grid) return;
+    grid.innerHTML='<div class="empty-state" style="grid-column:1/-1">Loading agents…</div>';
+    var list=[]; try{ list=await api('/agents'); }catch(e){ grid.innerHTML='<div class="empty-state" style="grid-column:1/-1">'+(gated(e)?'AI agents require the PRO plan.':'Could not load: '+e.message)+'</div>'; return; }
+    window.__agents=list;
+    grid.innerHTML=list.map(function(a){
+      var m=AGENT_META[a.key]||{icon:'#64748b',bg:'#f1f5f9'};
+      var state = !a.enabled ? '<span class="status-badge badge-gray" style="font-size:9px">Paused</span>'
+        : (a.requiresIntegration && !a.integrationReady) ? '<span class="status-badge badge-amber" style="font-size:9px">Needs integration</span>'
+        : '<span class="status-badge badge-green" style="font-size:9px">Deployed</span>';
+      var runInfo = a.lastRunAt ? ('Last run '+ftime(a.lastRunAt)+' · '+a.runCount+'×') : 'Not run yet';
+      var btns = a.enabled
+        ? '<button class="btn-sm" onclick="medcrmConfigAgent(\''+a.key+'\')">Configure</button><button class="btn-sm" onclick="medcrmPauseAgent(\''+a.key+'\')">Pause</button><button class="btn-sm primary" onclick="medcrmRunAgent(\''+a.key+'\')">Run</button>'
+        : '<button class="btn-sm" onclick="medcrmConfigAgent(\''+a.key+'\')">Configure</button><button class="btn-sm primary" onclick="medcrmDeployAgentKey(\''+a.key+'\')">Deploy</button>';
+      return '<div class="agent-card'+(a.enabled?' running':'')+'" style="cursor:default">'
+        +'<div class="agent-card-accent" style="background:'+m.icon+'"></div>'
+        +'<div class="agent-icon" style="background:'+m.bg+'"><span style="font-weight:700;color:'+m.icon+'">'+esc(a.name.substr(0,1))+'</span></div>'
+        +'<div class="agent-name">'+esc(a.name)+'</div>'
+        +'<div class="agent-desc">'+esc(a.description)+'</div>'
+        +'<div class="agent-footer" style="flex-direction:column;align-items:stretch;gap:8px">'
+        +'<div style="display:flex;align-items:center;justify-content:space-between"><span class="agent-stat" style="font-size:10px;color:var(--text3)">'+esc(runInfo)+'</span>'+state+'</div>'
+        +'<div style="display:flex;gap:6px">'+btns+'</div></div></div>';
+    }).join('');
+  }
+  window.renderAgentGrid=renderAgentGrid;
+
+  async function agentPatch(key, body, okMsg){
+    try{ await api('/agents/'+key,{method:'PATCH',body:body}); renderAgentGrid(); }
+    catch(e){ alert(gated(e)?'Only admins can manage agents.':'Failed: '+e.message); }
+  }
+  window.medcrmDeployAgentKey=function(key){ agentPatch(key,{enabled:true}); };
+  window.medcrmPauseAgent=function(key){ agentPatch(key,{enabled:false}); };
+  window.medcrmRunAgent=async function(key){
+    try{ var r=await api('/agents/'+key+'/run',{method:'POST'});
+      showModal('Agent run', '<div style="font-size:13px;color:var(--text2);line-height:1.6">'+esc(r.message)+'</div>', false);
+      renderAgentGrid(); if(document.getElementById('agentLog')) loadAgents();
+    }catch(e){ alert(gated(e)?'You need patient-update permission to run agents.':(e.message.indexOf('Deploy')>=0?'Deploy this agent first.':'Run failed: '+e.message)); }
+  };
+  window.medcrmConfigAgent=function(key){
+    var a=(window.__agents||[]).filter(function(x){return x.key===key;})[0]; if(!a) return;
+    var cfg=a.config||{};
+    var integ = a.requiresIntegration ? (
+      '<div style="font-size:11px;color:var(--text2);margin:8px 0;line-height:1.5">This is a clinical/regulatory agent. It will not produce clinical decisions or billing output until a real integration endpoint is set below <b>and</b> validated on your side.</div>'
+      +'<label>FHIR base URL</label><input type="text" id="cfgFhir" value="'+esc(cfg.fhirBaseUrl||'')+'" placeholder="https://fhir.yourorg.com/r4">'
+      +'<label>X12 / EDI endpoint</label><input type="text" id="cfgX12" value="'+esc(cfg.x12Endpoint||'')+'" placeholder="https://edi.yourorg.com/x12">'
+      +'<label>Payer API URL</label><input type="text" id="cfgPayer" value="'+esc(cfg.payerApiUrl||'')+'" placeholder="https://api.payer.com">'
+    ) : '<div style="font-size:11px;color:var(--text3);margin:8px 0">This agent runs on your existing data — no external integration required.</div>';
+    showModal('Configure — '+esc(a.name),
+      '<div class="frm">'+integ
+      +'<label>Notes (optional)</label><input type="text" id="cfgNotes" value="'+esc(cfg.notes||'')+'">'
+      +'<div style="text-align:right;margin-top:12px"><button class="btn-primary" onclick="medcrmSaveAgentConfig(\''+key+'\')">Save</button></div>'
+      +'<div id="cfgErr" style="color:#dc2626;font-size:12px;margin-top:8px"></div></div>', false);
+  };
+  window.medcrmSaveAgentConfig=async function(key){
+    var a=(window.__agents||[]).filter(function(x){return x.key===key;})[0]||{};
+    var config={};
+    if(a.requiresIntegration){
+      var f=(document.getElementById('cfgFhir')||{}).value, x=(document.getElementById('cfgX12')||{}).value, p=(document.getElementById('cfgPayer')||{}).value;
+      if(f) config.fhirBaseUrl=f; if(x) config.x12Endpoint=x; if(p) config.payerApiUrl=p;
+    }
+    var n=(document.getElementById('cfgNotes')||{}).value; if(n) config.notes=n;
+    try{ await api('/agents/'+key,{method:'PATCH',body:{config:config}}); closeForm(); renderAgentGrid(); }
+    catch(e){ document.getElementById('cfgErr').textContent=gated(e)?'Only admins can configure agents.':'Failed: '+e.message; }
+  };
+
   async function loadAgents() {
+    renderAgentGrid();
     var log = document.getElementById('agentLog'); if (!log) return;
     log.innerHTML = empty('Loading…');
     try {
       var l = await api('/agents/activity?take=40');
+      window.__agentLog = l;
       if (!l.length) { log.innerHTML = empty('No agent activity.'); return; }
       log.innerHTML = l.map(function (a) {
         return '<div class="log-line"><span class="log-time">' + esc(ftime(a.createdAt)) + '</span><span class="log-source ' + srcClass(a.source) + '">' + esc(a.source) + '</span><span class="log-msg">' + esc(a.message) + '</span></div>';
