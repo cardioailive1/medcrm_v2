@@ -1115,13 +1115,14 @@ body{font-family:var(--font);background:var(--bg);color:var(--text1);font-size:1
             <div class="pip"><div class="pip-av">DH</div></div>
             <div class="call-timer" id="thTimer" style="display:none"><span class="rec-dot"></span><span id="callTimer">00:00:00</span></div>
             <div class="live-badge" id="thLive" style="display:none">● LIVE</div>
+            <div id="jitsiMount" style="display:none;position:absolute;inset:0;z-index:5;background:#0b1220;border-radius:inherit;overflow:hidden"></div>
             <div class="video-controls">
-              <button class="vc-btn on" title="Mute"><svg width="16" height="16" viewBox="0 0 16 16" fill="white"><path d="M8 1a3 3 0 013 3v4a3 3 0 01-6 0V4a3 3 0 013-3zM4 8a4 4 0 008 0M8 12v3"/></svg></button>
-              <button class="vc-btn on" title="Camera"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="white" stroke-width="1.5"><rect x="1" y="4" width="10" height="8" rx="2"/><path d="M11 6l4-2v8l-4-2V6z"/></svg></button>
-              <button class="vc-btn on" title="Screen share"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="white" stroke-width="1.5"><rect x="1" y="2" width="14" height="10" rx="2"/><path d="M5 15h6M8 12v3"/></svg></button>
-              <button class="vc-btn on" title="Chat"><svg width="16" height="16" viewBox="0 0 16 16" fill="white"><path d="M1 2h14v9a1 1 0 01-1 1H4l-3 2V2z"/></svg></button>
-              <button class="vc-btn on" title="Record"><svg width="16" height="16" viewBox="0 0 16 16" fill="white"><circle cx="8" cy="8" r="5"/><circle cx="8" cy="8" r="2.5" fill="#f87171"/></svg></button>
-              <button class="vc-end">End</button>
+              <button class="vc-btn on" title="Mute" onclick="medcrmTHControl('toggleAudio',this)"><svg width="16" height="16" viewBox="0 0 16 16" fill="white"><path d="M8 1a3 3 0 013 3v4a3 3 0 01-6 0V4a3 3 0 013-3zM4 8a4 4 0 008 0M8 12v3"/></svg></button>
+              <button class="vc-btn on" title="Camera" onclick="medcrmTHControl('toggleVideo',this)"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="white" stroke-width="1.5"><rect x="1" y="4" width="10" height="8" rx="2"/><path d="M11 6l4-2v8l-4-2V6z"/></svg></button>
+              <button class="vc-btn on" title="Screen share" onclick="medcrmTHControl('toggleShareScreen',this)"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="white" stroke-width="1.5"><rect x="1" y="2" width="14" height="10" rx="2"/><path d="M5 15h6M8 12v3"/></svg></button>
+              <button class="vc-btn on" title="Chat" onclick="medcrmTHControl('toggleChat',this)"><svg width="16" height="16" viewBox="0 0 16 16" fill="white"><path d="M1 2h14v9a1 1 0 01-1 1H4l-3 2V2z"/></svg></button>
+              <button class="vc-btn on" title="Tile view" onclick="medcrmTHControl('toggleTileView',this)"><svg width="16" height="16" viewBox="0 0 16 16" fill="white"><circle cx="8" cy="8" r="5"/><circle cx="8" cy="8" r="2.5" fill="#f87171"/></svg></button>
+              <button class="vc-end" onclick="medcrmEndVisit()">End</button>
             </div>
           </div>
 
@@ -1148,7 +1149,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text1);font-size:1
               <div class="vital-trend delta-down" style="font-size:10px">▲ Above target</div>
             </div>
           </div>
-          <div style="font-size:10px;color:var(--text3);margin-top:8px;text-align:center">Video is representational — connect a provider (e.g. Twilio/WebRTC) to enable live calls. Scheduling & queue below are live.</div>
+          <div style="font-size:10px;color:var(--text3);margin-top:8px;text-align:center">Live video via Jitsi (WebRTC). Public meet.jit.si is fine for testing but <b>not HIPAA-compliant</b> — set a self-hosted/BAA Jitsi domain for real PHI.</div>
         </div>
 
         <!-- Queue panel -->
@@ -3548,8 +3549,9 @@ body{font-family:var(--font);background:var(--bg);color:var(--text1);font-size:1
         else q.innerHTML = qd.map(function (s) {
           var st = s.status === 'IN_SESSION' ? 'badge-teal">In session' : (s.status === 'WAITING' ? 'badge-amber">Waiting' : 'badge-gray">Scheduled');
           var meta = s.status === 'WAITING' && s.waitMinutes != null ? 'Wait: ' + s.waitMinutes + ' min' : (s.scheduledAt ? ftime(s.scheduledAt) : '');
+          var sj = JSON.stringify({id:s.id,patientName:s.patientName,department:s.department,type:s.type}).replace(/"/g,'&quot;');
           return '<div class="queue-card"><div class="qc-header"><div class="qc-av" style="background:#e6faf8;color:#0d9488">' + esc(ini.apply(null, s.patientName.split(' '))) + '</div><div><div class="qc-name">' + esc(s.patientName) + '</div><div class="qc-dept">' + esc((s.department || '') + (s.type ? ' · ' + s.type : '')) + '</div></div></div>' +
-            '<div class="qc-footer"><span class="status-badge ' + st + '</span><span style="margin-left:auto">' + esc(meta) + '</span></div></div>';
+            '<div class="qc-footer"><span class="status-badge ' + st + '</span><button class="btn-sm primary" style="margin-left:auto;padding:3px 10px" onclick="medcrmStartVisit(' + sj + ')">Join</button></div></div>';
         }).join('');
       } catch (e) { q.innerHTML = empty(gated(e) ? 'Telehealth requires the PRO plan.' : 'Could not load: ' + e.message); }
     }
@@ -4485,6 +4487,60 @@ body{font-family:var(--font);background:var(--bg);color:var(--text1);font-size:1
   };
   window.medcrmContactSales = function () {
     window.location.href = 'mailto:sales@medcrm.example?subject=MedCRM%20Enterprise%20inquiry';
+  };
+
+  /* ---- Real telehealth video (Jitsi WebRTC) ---- */
+  var JITSI_DOMAIN = 'meet.jit.si';   // set to a self-hosted / BAA-covered domain for real PHI
+  var _jitsiApi = null;
+  function ensureJitsi(){
+    return new Promise(function(res,rej){
+      if(window.JitsiMeetExternalAPI) return res();
+      var sc=document.createElement('script');
+      sc.src='https://'+JITSI_DOMAIN+'/external_api.js';
+      sc.onload=function(){res();}; sc.onerror=function(){rej(new Error('Could not load video library'));};
+      document.head.appendChild(sc);
+    });
+  }
+  function thRoom(session){
+    var orgId=(window.__me&&window.__me.organization&&window.__me.organization.id)||'org';
+    var raw='medcrm-'+orgId+'-'+(session.id||session.patientName||'room');
+    return raw.replace(/[^a-zA-Z0-9-]/g,'');
+  }
+  window.medcrmStartVisit = async function(session){
+    try{
+      var mount=document.getElementById('jitsiMount'); if(!mount) return;
+      var stt=document.getElementById('thStatus'), nm=document.getElementById('thName'), av=document.getElementById('thAvatar');
+      if(nm) nm.textContent=esc(session.patientName||'Visit');
+      if(av) av.textContent=esc(ini.apply(null,(session.patientName||'? ?').split(' ')));
+      if(stt) stt.textContent='Connecting…';
+      await ensureJitsi();
+      if(_jitsiApi){ try{_jitsiApi.dispose();}catch(e){} _jitsiApi=null; }
+      mount.innerHTML=''; mount.style.display='block';
+      var me=window.__me||{};
+      _jitsiApi=new window.JitsiMeetExternalAPI(JITSI_DOMAIN,{
+        roomName: thRoom(session),
+        parentNode: mount,
+        width:'100%', height:'100%',
+        userInfo:{ displayName: ((me.firstName||'')+' '+(me.lastName||'')).trim()||'Provider' },
+        configOverwrite:{ prejoinPageEnabled:false, disableDeepLinking:true },
+        interfaceConfigOverwrite:{ MOBILE_APP_PROMO:false, SHOW_JITSI_WATERMARK:false }
+      });
+      _jitsiApi.addEventListener('videoConferenceLeft', function(){ medcrmEndVisit(); });
+      var lv=document.getElementById('thLive'); if(lv) lv.style.display='';
+      if(stt) stt.textContent=esc((session.department||'')+(session.type?' · '+session.type:'')||'Telehealth visit');
+    }catch(e){ alert('Could not start video: '+e.message); }
+  };
+  window.medcrmEndVisit = function(){
+    if(_jitsiApi){ try{_jitsiApi.dispose();}catch(e){} _jitsiApi=null; }
+    var mount=document.getElementById('jitsiMount'); if(mount){ mount.style.display='none'; mount.innerHTML=''; }
+    var lv=document.getElementById('thLive'); if(lv) lv.style.display='none';
+    var tm=document.getElementById('thTimer'); if(tm) tm.style.display='none';
+    var nm=document.getElementById('thName'), stt=document.getElementById('thStatus'), av=document.getElementById('thAvatar');
+    if(nm) nm.textContent='No active session'; if(stt) stt.textContent='Start a visit from the queue'; if(av) av.textContent='—';
+  };
+  window.medcrmTHControl = function(cmd,btn){
+    if(!_jitsiApi){ return; }
+    try{ _jitsiApi.executeCommand(cmd); if(btn && (cmd==='toggleAudio'||cmd==='toggleVideo')) btn.classList.toggle('on'); }catch(e){}
   };
 
   window.medcrmScheduleTelehealth = async function(){
