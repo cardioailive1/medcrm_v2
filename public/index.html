@@ -3873,18 +3873,65 @@ body{font-family:var(--font);background:var(--bg);color:var(--text1);font-size:1
   async function loadInterop() {
     var pg = document.getElementById('interop'); if (!pg) return;
     pg.innerHTML = empty('Loading…');
-    try {
-      var status = await api('/interop/status');
-      var rows = await api('/interop');
-      var cards = '<div class="interop-status-row">' + ['FHIR', 'HL7', 'PACS'].map(function (k) {
-        return '<div class="interop-status-card"><div class="is-label">' + k + ' resources</div><div class="is-val" style="color:var(--accent)">' + (status[k] || 0) + '</div><div class="is-status"><div class="is-dot" style="background:var(--green)"></div><span style="color:var(--green);font-weight:500">Stored</span></div></div>';
-      }).join('') + '</div>';
-      var list = rows.length ? '<div class="resource-list">' + rows.map(function (r) {
-        return '<div class="resource-item"><div class="resource-icon" style="background:#dbeafe;color:#1e40af;font-size:10px">' + esc(r.kind) + '</div><div class="resource-body"><div class="resource-type">' + esc(r.resourceType) + '</div><div class="resource-id">' + esc(r.label) + '</div><div class="resource-meta">' + esc(r.meta || '') + '</div></div><span class="status-badge badge-green">' + esc(r.status) + '</span></div>';
-      }).join('') + '</div>' : empty('No interop resources.');
-      pg.innerHTML = cards + '<div style="font-size:11px;color:var(--text3);margin-bottom:10px">Stored interoperability records (representational store — not a live FHIR/HL7/PACS connection).</div>' + list;
-    } catch (e) { pg.innerHTML = empty(gated(e) ? 'Interoperability requires the ENTERPRISE plan.' : 'Could not load: ' + e.message); }
+    var conns = [], status = {};
+    try { conns = await api('/interop/connections'); status = await api('/interop/status'); }
+    catch (e) { pg.innerHTML = empty(gated(e) ? 'Interoperability requires the ENTERPRISE plan.' : 'Could not load: ' + e.message); return; }
+    window.__interop = conns;
+    var META = { FHIR:{t:'FHIR R4', d:'RESTful clinical data (Patient, Observation, Encounter…)', c:'var(--accent)'},
+                 HL7:{t:'HL7 v2 / v3', d:'ADT / ORM / ORU messaging via HTTP ingest', c:'var(--accent2)'},
+                 PACS:{t:'PACS / DICOM', d:'Imaging studies via DICOMweb (QIDO/WADO-RS)', c:'var(--purple)'} };
+    function dot(st){ var c = st==='ONLINE'?'var(--green)':st==='OFFLINE'||st==='ERROR'?'#dc2626':'var(--text3)'; return '<div class="is-dot" style="background:'+c+'"></div><span style="color:'+c+';font-weight:600;font-size:11px">'+(st||'Not configured')+'</span>'; }
+    var cards = '<div class="interop-status-row">' + conns.map(function(c){
+      var m = META[c.kind]||{t:c.kind,d:'',c:'var(--accent)'};
+      var latency = c.lastLatencyMs!=null ? (' · '+c.lastLatencyMs+'ms') : '';
+      var last = c.lastCheckedAt ? ('Checked '+ftime(c.lastCheckedAt)+latency) : 'Never tested';
+      return '<div class="interop-status-card" style="text-align:left">'
+        + '<div class="is-label" style="font-weight:700;color:var(--text1)">'+esc(m.t)+'</div>'
+        + '<div style="font-size:11px;color:var(--text3);margin:4px 0 8px">'+esc(m.d)+'</div>'
+        + '<div style="font-size:11px;color:var(--text2);margin-bottom:2px">'+(c.baseUrl?esc(c.baseUrl):'<span style="color:var(--text3)">No endpoint set</span>')+'</div>'
+        + '<div class="is-status" style="margin:6px 0">'+dot(c.status)+'</div>'
+        + '<div style="font-size:10px;color:var(--text3)">'+esc(last)+(c.lastError?' · '+esc(c.lastError):'')+'</div>'
+        + '<div style="display:flex;gap:6px;margin-top:10px">'
+        + '<button class="btn-sm" onclick="medcrmConfigInterop(\''+c.kind+'\')">Configure</button>'
+        + '<button class="btn-sm" onclick="medcrmTestInterop(\''+c.kind+'\')">Test</button>'
+        + (c.kind==='FHIR' ? '<button class="btn-sm primary" onclick="medcrmFhirImport()">Import</button>' : '')
+        + '</div></div>';
+    }).join('') + '</div>';
+    var rows = [];
+    try { rows = await api('/interop'); } catch(e){}
+    var list = rows.length ? '<div style="font-size:12px;font-weight:600;margin:16px 0 8px">Imported / recorded resources</div><div class="resource-list">' + rows.map(function(r){
+        return '<div class="resource-item"><div class="resource-icon" style="background:#dbeafe;color:#1e40af;font-size:10px">'+esc(r.kind)+'</div><div class="resource-body"><div class="resource-type">'+esc(r.resourceType)+'</div><div class="resource-id">'+esc(r.label)+'</div><div class="resource-meta">'+esc(r.meta||'')+'</div></div><span class="status-badge badge-green">'+esc(r.status)+'</span></div>';
+      }).join('') + '</div>' : '';
+    pg.innerHTML = cards + '<div style="font-size:11px;color:var(--text3);margin-top:10px">Live connections. FHIR/DICOMweb are called directly; HL7 v2 uses an HTTP ingest endpoint. Configure a base URL, then Test.</div>' + list;
   }
+  window.medcrmConfigInterop = function(kind){
+    var c = (window.__interop||[]).filter(function(x){return x.kind===kind;})[0]||{kind:kind};
+    showModal('Configure '+esc(kind)+' connection',
+      '<div class="frm"><label>Base URL</label><input type="text" id="ioUrl" value="'+esc(c.baseUrl||'')+'" placeholder="'+(kind==='FHIR'?'https://fhir.yourorg.com/r4':kind==='PACS'?'https://pacs.yourorg.com/dicom-web':'https://hl7-gateway.yourorg.com')+'">'
+      +'<label>Auth type</label><select id="ioAuth"><option value="NONE"'+(c.authType==='NONE'?' selected':'')+'>None</option><option value="BEARER"'+(c.authType==='BEARER'?' selected':'')+'>Bearer token</option><option value="BASIC"'+(c.authType==='BASIC'?' selected':'')+'>Basic (base64)</option></select>'
+      +'<label>Token / credential</label><input type="text" id="ioTok" value="'+(c.authToken?'********':'')+'" placeholder="paste token — leave ******** to keep existing">'
+      +'<div style="text-align:right;margin-top:12px"><button class="btn-primary" onclick="medcrmSaveInterop(\''+kind+'\')">Save</button></div>'
+      +'<div id="ioErr" style="color:#dc2626;font-size:12px;margin-top:8px"></div></div>', false);
+  };
+  window.medcrmSaveInterop = async function(kind){
+    var body = { kind:kind, baseUrl:document.getElementById('ioUrl').value.trim(), authType:document.getElementById('ioAuth').value };
+    var tok = document.getElementById('ioTok').value; if(tok && tok!=='********') body.authToken=tok;
+    try{ await api('/interop/connections',{method:'POST',body:body}); closeForm(); loadInterop(); }
+    catch(e){ document.getElementById('ioErr').textContent=gated(e)?'Only admins can configure integrations.':'Failed: '+e.message; }
+  };
+  window.medcrmTestInterop = async function(kind){
+    try{ var r = await api('/interop/connections/'+kind+'/test',{method:'POST'});
+      showModal('Test '+esc(kind), '<div style="font-size:13px;line-height:1.6"><b style="color:'+(r.status==='ONLINE'?'#16a34a':'#dc2626')+'">'+esc(r.status)+'</b><br>'+esc(r.detail)+(r.latency?'<br><span style="color:var(--text3)">'+r.latency+'ms</span>':'')+'</div>', false);
+      loadInterop();
+    }catch(e){ alert(gated(e)?'Only admins can test integrations.':(e.message||'Test failed')); }
+  };
+  window.medcrmFhirImport = async function(){
+    try{ var r = await api('/interop/fhir/import',{method:'POST'});
+      var preview = (r.patients||[]).slice(0,10).map(function(p){return '<div style="font-size:12px;padding:4px 0;border-bottom:1px solid var(--border)">'+esc(p.name)+' <span style="color:var(--text3)">· '+esc(p.gender||'')+' '+esc(p.birthDate||'')+'</span></div>';}).join('');
+      showModal('FHIR import', '<div style="font-size:13px;margin-bottom:8px">Pulled <b>'+r.imported+'</b> Patient resources (server total: '+r.total+').</div>'+preview, false);
+      loadInterop();
+    }catch(e){ alert(gated(e)?'You need patient-update permission to import.':(e.message||'Import failed')); }
+  };
 
   /* ---------------- clear leftover static pages ---------------- */
   function clearStatic() {
