@@ -53,6 +53,7 @@ model Organization {
   careActivities       CareActivity[]
   careGaps             CareGap[]
   agents               Agent[]
+  integrationConnections IntegrationConnection[]
   users                User[]
   patients             Patient[]
   auditLogs            AuditLog[]
@@ -545,5 +546,26 @@ model Agent {
   updatedAt           DateTime     @updatedAt
 
   @@unique([organizationId, key])
+  @@index([organizationId])
+}
+
+model IntegrationConnection {
+  id             String       @id @default(cuid())
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organizationId String
+  kind           String       // FHIR | HL7 | PACS
+  baseUrl        String?
+  authType       String       @default("NONE") // NONE | BEARER | BASIC
+  authToken      String?
+  enabled        Boolean      @default(false)
+  status         String       @default("UNKNOWN") // ONLINE | OFFLINE | ERROR | UNKNOWN
+  lastCheckedAt  DateTime?
+  lastLatencyMs  Int?
+  lastError      String?
+  meta           Json?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@unique([organizationId, kind])
   @@index([organizationId])
 }
