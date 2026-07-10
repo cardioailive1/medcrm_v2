@@ -1,7 +1,8 @@
-import { Body, Controller, Get, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post } from '@nestjs/common';
 import { Tier } from '@prisma/client';
 import { CmsService } from './cms.service';
 import { CreateMeasureDto } from './create-measure.dto';
+import { UpdateMeasureDto } from './update-measure.dto';
 import { RequirePermissions } from '../common/decorators/permissions.decorator';
 import { MinTier } from '../common/decorators/min-tier.decorator';
 import { Permission } from '../common/enums/permission.enum';
@@ -22,5 +23,17 @@ export class CmsController {
   @Post()
   create(@CurrentUser() u: AuthUser, @Body() dto: CreateMeasureDto) {
     return this.svc.create(u.organizationId, dto);
+  }
+
+  @RequirePermissions(Permission.BILLING_MANAGE)
+  @Patch(':id')
+  update(@CurrentUser() u: AuthUser, @Param('id') id: string, @Body() dto: UpdateMeasureDto) {
+    return this.svc.update(u.organizationId, id, dto);
+  }
+
+  @RequirePermissions(Permission.BILLING_MANAGE)
+  @Delete(':id')
+  remove(@CurrentUser() u: AuthUser, @Param('id') id: string) {
+    return this.svc.remove(u.organizationId, id);
   }
 }
