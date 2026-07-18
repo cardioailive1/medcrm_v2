@@ -3785,10 +3785,66 @@ body{font-family:var(--font);background:var(--bg);color:var(--text1);font-size:1
         '<div class="card"><div class="card-header"><span class="card-title">Visit Modality</span></div><div class="card-body"><div class="progress-list">' +
         '<div class="progress-item"><div class="progress-meta"><span class="progress-name">In-person</span><span class="progress-val">' + o.modalitySplit.inPerson + '</span></div><div class="progress-track"><div class="progress-fill" style="width:' + pctOf(o.modalitySplit.inPerson, o.appointments) + '%;background:#1a6fa8"></div></div></div>' +
         '<div class="progress-item"><div class="progress-meta"><span class="progress-name">Telehealth</span><span class="progress-val">' + o.modalitySplit.telehealth + '</span></div><div class="progress-track"><div class="progress-fill" style="width:' + pctOf(o.modalitySplit.telehealth, o.appointments) + '%;background:#0d9488"></div></div></div>' +
-        '</div></div></div></div>';
+        '</div></div></div></div>' +
+        '<div id="popHealth" style="margin-top:20px"></div>';
+      renderPopHealth();
     } catch (e) { pg.innerHTML = empty(gated(e) ? 'Analytics requires the PRO plan.' : 'Could not load analytics: ' + e.message); }
   }
   function pctOf(n, d) { return d ? Math.round(n / d * 100) : 0; }
+
+  window.__phOpts = {};
+  async function renderPopHealth(){
+    var el=document.getElementById('popHealth'); if(!el) return;
+    el.innerHTML='<div class="empty-state">Loading population health…</div>';
+    var q=''; var o=window.__phOpts||{};
+    if(o.costPerIntervention) q+='costPerIntervention='+o.costPerIntervention+'&';
+    if(o.avoidedEventValue) q+='avoidedEventValue='+o.avoidedEventValue+'&';
+    if(o.avoidanceRate) q+='avoidanceRate='+o.avoidanceRate+'&';
+    var d=null; try{ d=await api('/analytics/population-health'+(q?('?'+q):'')); }catch(e){ el.innerHTML=''; return; }
+    var totalRisk=(d.risk.LOW||0)+(d.risk.MEDIUM||0)+(d.risk.HIGH||0);
+    function bar(label,val,tot,color){ var p=tot?Math.round(val/tot*100):0; return '<div class="progress-item"><div class="progress-meta"><span class="progress-name">'+label+'</span><span class="progress-val">'+val+'</span></div><div class="progress-track"><div class="progress-fill" style="width:'+p+'%;background:'+color+'"></div></div></div>'; }
+    var roi=d.roi; var roiColor=roi.roiPct>=0?'#16a34a':'#dc2626';
+    var t=d.highCostRisk.tiers; var totT=t.elevated+t.moderate+t.low;
+    el.innerHTML=
+      '<div style="background:linear-gradient(135deg,#0f766e,#0891b2);border-radius:var(--r);padding:18px 22px;margin-bottom:16px;color:#fff;display:flex;gap:28px;flex-wrap:wrap;align-items:center">'
+      +'<div><div style="font-size:11px;color:rgba(255,255,255,0.6);text-transform:uppercase;letter-spacing:.5px">Value-Based Care — Population Health</div><div style="font-size:13px;color:rgba(255,255,255,0.85);margin-top:2px">Cardiovascular cohort burden, high-cost risk prioritization &amp; preventive ROI</div></div>'
+      +'<div style="margin-left:auto;display:flex;gap:24px;flex-wrap:wrap">'
+      +'<div><div style="font-size:10px;color:rgba(255,255,255,0.6);text-transform:uppercase">Attributed</div><div style="font-size:24px;font-weight:600;font-family:var(--mono)">'+d.cohort.attributed+'</div></div>'
+      +'<div><div style="font-size:10px;color:rgba(255,255,255,0.6);text-transform:uppercase">Elevated risk</div><div style="font-size:24px;font-weight:600;font-family:var(--mono);color:#fca5a5">'+t.elevated+'</div></div>'
+      +'<div><div style="font-size:10px;color:rgba(255,255,255,0.6);text-transform:uppercase">Preventive ROI</div><div style="font-size:24px;font-weight:600;font-family:var(--mono);color:'+(roi.roiPct>=0?'#86efac':'#fca5a5')+'">'+roi.roiPct+'%</div></div>'
+      +'</div></div>'
+      +'<div class="analytics-grid">'
+      +'<div class="card"><div class="card-header"><span class="card-title">Risk Stratification</span></div><div class="card-body"><div class="progress-list">'
+        +bar('High risk',d.risk.HIGH||0,totalRisk,'#dc2626')+bar('Medium',d.risk.MEDIUM||0,totalRisk,'#d97706')+bar('Low',d.risk.LOW||0,totalRisk,'#16a34a')
+        +'</div></div></div>'
+      +'<div class="card"><div class="card-header"><span class="card-title">High-Cost Event Risk Indicator</span></div><div class="card-body"><div class="progress-list">'
+        +bar('Elevated',t.elevated,totT,'#dc2626')+bar('Moderate',t.moderate,totT,'#d97706')+bar('Low',t.low,totT,'#16a34a')
+        +'</div><div style="font-size:10px;color:var(--text3);margin-top:8px;line-height:1.5">'+esc(d.highCostRisk.method)+' '+esc(d.highCostRisk.rule)+'</div></div></div>'
+      +'</div>'
+      +'<div class="card" style="margin-top:16px"><div class="card-header"><span class="card-title">Preventive Intervention ROI ('+esc(roi.period)+')</span><button class="btn-sm" style="margin-left:auto" onclick="medcrmRoiAssumptions()">Adjust assumptions</button></div>'
+        +'<div class="card-body"><div class="kpi-row">'
+        +'<div class="kpi-box"><div class="kpi-val">'+roi.interventions+'</div><div class="kpi-label">Interventions delivered</div></div>'
+        +'<div class="kpi-box"><div class="kpi-val">$'+roi.programCost.toLocaleString()+'</div><div class="kpi-label">Program cost</div></div>'
+        +'<div class="kpi-box"><div class="kpi-val">$'+roi.estimatedAvoidedCost.toLocaleString()+'</div><div class="kpi-label">Est. avoided cost</div></div>'
+        +'<div class="kpi-box"><div class="kpi-val" style="color:'+roiColor+'">$'+roi.netSavings.toLocaleString()+'</div><div class="kpi-label">Net savings</div></div>'
+        +'</div><div style="font-size:10px;color:var(--text3);margin-top:10px;line-height:1.5">Assumptions: $'+roi.assumptions.costPerIntervention+'/intervention · $'+roi.assumptions.avoidedEventValue.toLocaleString()+' per avoided high-cost CV event · '+Math.round(roi.assumptions.avoidanceRate*100)+'% of elevated-risk engaged avoid an event. Adjust to your contract terms.</div></div></div>'
+      +'<div style="font-size:11px;color:var(--text3);margin-top:10px">Built for hospital systems, payers, and public-health agencies to monitor cardiovascular disease burden, prioritize high-cost risk, and measure preventive-program ROI. Figures derive from your live enrollment, care-gap, and activity data.</div>';
+  }
+  window.renderPopHealth=renderPopHealth;
+  window.medcrmRoiAssumptions=function(){
+    var o=window.__phOpts||{};
+    showModal('ROI assumptions',
+      '<div class="frm"><label>Cost per intervention ($)</label><input type="number" id="roiCost" value="'+(o.costPerIntervention||25)+'">'
+      +'<label>Value of one avoided high-cost CV event ($)</label><input type="number" id="roiAvoid" value="'+(o.avoidedEventValue||12000)+'">'
+      +'<label>Avoidance rate (0-1) among engaged elevated-risk</label><input type="number" step="0.01" id="roiRate" value="'+(o.avoidanceRate||0.1)+'">'
+      +'<div style="text-align:right;margin-top:12px"><button class="btn-primary" onclick="medcrmApplyRoi()">Apply</button></div></div>', false);
+  };
+  window.medcrmApplyRoi=function(){
+    window.__phOpts={ costPerIntervention:parseFloat(document.getElementById('roiCost').value||'25'),
+      avoidedEventValue:parseFloat(document.getElementById('roiAvoid').value||'12000'),
+      avoidanceRate:parseFloat(document.getElementById('roiRate').value||'0.1') };
+    closeForm(); renderPopHealth();
+  };
 
   /* ---------------- satisfaction (PRO) ---------------- */
   async function renderSatisfaction() {
