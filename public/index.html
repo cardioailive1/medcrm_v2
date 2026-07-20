@@ -674,7 +674,10 @@ body{font-family:var(--font);background:var(--bg);color:var(--text1);font-size:1
 .login-btn{width:100%;padding:10px;background:var(--accent);color:#fff;border:none;border-radius:var(--r-sm);font-family:var(--font);font-size:13px;font-weight:600;cursor:pointer;margin-top:4px}
 .login-btn:hover{background:#155e8f}.login-btn:disabled{opacity:.6;cursor:default}
 .login-error{color:var(--red);font-size:12px;min-height:16px;margin-top:10px;text-align:center}
-.login-hint{font-size:11px;color:var(--text3);text-align:center;margin-top:14px;line-height:1.5}
+.login-hint{font-size:11px;color:var(--text3);text-align:center;margin-top:14px;line-height:1.7}
+.login-consent a{color:var(--accent);text-decoration:underline}
+.login-legal-link{color:var(--accent);text-decoration:none;font-weight:600}
+.login-legal-link:hover{text-decoration:underline}
 
 /* modal form framework */
 .modal-overlay{position:fixed;inset:0;z-index:1100;background:rgba(12,25,48,.45);display:flex;align-items:center;justify-content:center;padding:20px}
@@ -857,11 +860,12 @@ body{font-family:var(--font);background:var(--bg);color:var(--text1);font-size:1
         <div id="pwReqs" class="pw-reqs"><span data-req="len">12+ chars</span><span data-req="upper">A-Z</span><span data-req="lower">a-z</span><span data-req="num">0-9</span><span data-req="sym">symbol</span></div>
       </div>
       <div class="login-field"><label for="regConfirm">Confirm password</label><input id="regConfirm" type="password" autocomplete="new-password" required placeholder="Re-enter password"/></div>
+      <label class="login-consent"><input type="checkbox" id="regLegal"/> <span>I have read and agree to the <a href="terms.html" target="_blank" rel="noopener">Terms of Use</a> and <a href="privacy.html" target="_blank" rel="noopener">Privacy Statement</a>.</span></label>
       <label class="login-consent"><input type="checkbox" id="regTerms"/> <span>I acknowledge this is a scaffold that is <strong>not certified</strong> HIPAA/SOC 2/Part 11, and I will not store real PHI until the required BAAs, encryption review, and audits are in place.</span></label>
       <button id="registerBtn" class="login-btn" type="submit">Create account</button>
       <div id="registerError" class="login-error"></div>
     </form>
-    <div class="login-hint">Protected health information demo · Sessions auto-expire after inactivity.</div>
+    <div class="login-hint">Protected health information demo · Sessions auto-expire after inactivity.<br/><a href="terms.html" target="_blank" rel="noopener" class="login-legal-link">Terms of Use</a> · <a href="privacy.html" target="_blank" rel="noopener" class="login-legal-link">Privacy Statement</a> · <a href="baa.html" target="_blank" rel="noopener" class="login-legal-link">BAA</a></div>
     <div style="text-align:center;margin-top:10px;font-size:10px;color:var(--text3);letter-spacing:.3px">Powered by <b style="color:var(--text2)">Corverxis Technologies</b> · AI Engineering &amp; Consulting</div>
     </div>
   </div>
@@ -4330,9 +4334,11 @@ body{font-family:var(--font);background:var(--bg);color:var(--text1);font-size:1
     var pw = document.getElementById('regPassword').value;
     var confirm = document.getElementById('regConfirm').value;
     var terms = document.getElementById('regTerms').checked;
+    var legal = document.getElementById('regLegal').checked;
     var c = pwChecks(pw); var ok = Object.keys(c).every(function (k) { return c[k]; });
     if (!ok) { if (er) er.textContent = 'Password must be 12+ chars with upper, lower, number, and symbol.'; return; }
     if (pw !== confirm) { if (er) er.textContent = 'Passwords do not match.'; return; }
+    if (!legal) { if (er) er.textContent = 'Please read and agree to the Terms of Use and Privacy Statement.'; return; }
     if (!terms) { if (er) er.textContent = 'You must acknowledge the PHI-handling notice.'; return; }
     var btn = document.getElementById('registerBtn'); if (btn) { btn.disabled = true; btn.textContent = 'Creating…'; }
     try {
